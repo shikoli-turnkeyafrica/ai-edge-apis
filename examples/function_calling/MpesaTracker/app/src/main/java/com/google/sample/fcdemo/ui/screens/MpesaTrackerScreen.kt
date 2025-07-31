@@ -41,6 +41,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.ExperimentalPagingApi
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DateRange
 
@@ -60,7 +62,7 @@ fun MpesaTrackerScreen(
     val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
     val workProgress by viewModel.workProgress.collectAsStateWithLifecycle()
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -71,111 +73,178 @@ fun MpesaTrackerScreen(
                     )
                 )
             )
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CashFlowHeader()
-        Spacer(modifier = Modifier.height(16.dp))
+        // Header
+        item {
+            CashFlowHeader()
+        }
         
         // 🤖 EdgeFinance AI Agents Status Cards
-        AgentStatusCards(
-            viewModel = viewModel,
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        Spacer(modifier = Modifier.height(12.dp))
+        item {
+            AgentStatusCards(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         
         // 🔄 Agent Processing Pipeline
-        AgentPipeline(
-            viewModel = viewModel,
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        Spacer(modifier = Modifier.height(12.dp))
+        item {
+            AgentPipeline(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         
         // 💬 Agent Chat System
-        AgentChatSystem(
-            viewModel = viewModel,
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
+        item {
+            AgentChatSystem(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         
         // Privacy and View toggles
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Privacy toggles (smaller)
-            PrivacyToggles(
-                modifier = Modifier.weight(2f),
-                showNames = showNames,
-                showAmounts = showAmounts,
-                onToggleNames = { showNames = !showNames },
-                onToggleAmounts = { showAmounts = !showAmounts }
-            )
-            
-            // View mode toggle
-            ViewModeToggle(
-                modifier = Modifier.weight(1f),
-                useGroupedView = useGroupedView,
-                onToggleView = { useGroupedView = !useGroupedView }
-            )
-            
-            // 🎭 Agent Demo Button
-            Card(
-                modifier = Modifier
-                    .weight(0.8f)
-                    .glass(),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                elevation = CardDefaults.cardElevation(0.dp),
-                onClick = { viewModel.startAgentDemo() }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                // Privacy toggles (smaller)
+                PrivacyToggles(
+                    modifier = Modifier.weight(2f),
+                    showNames = showNames,
+                    showAmounts = showAmounts,
+                    onToggleNames = { showNames = !showNames },
+                    onToggleAmounts = { showAmounts = !showAmounts }
+                )
+                
+                // View mode toggle
+                ViewModeToggle(
+                    modifier = Modifier.weight(1f),
+                    useGroupedView = useGroupedView,
+                    onToggleView = { useGroupedView = !useGroupedView }
+                )
+                
+                // 🎭 Agent Demo Button
+                Card(
+                    modifier = Modifier
+                        .weight(0.8f)
+                        .glass(),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    elevation = CardDefaults.cardElevation(0.dp),
+                    onClick = { viewModel.startAgentDemo() }
                 ) {
-                    Text(
-                        text = "🤖 Demo",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
-                    )
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "🤖 Demo",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
         // Processing Indicator
         if (isProcessing) {
-            ProcessingCard(workProgress)
-            Spacer(modifier = Modifier.height(16.dp))
+            item {
+                ProcessingCard(workProgress)
+            }
         }
         
-        // Transactions List - switch between paged and grouped views
+        // 📊 Transactions Section Header
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .glass(),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.recent_transactions),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+        
+        // 📱 Transactions List - add individual transactions as items
         if (useGroupedView) {
-            TransactionsListGrouped(
-                groupedTransactions = groupedTransactions,
-                showNames = showNames,
-                showAmounts = showAmounts
-            )
+            // Grouped view - add by month
+            groupedTransactions.forEach { (month, transactions) ->
+                item {
+                    MonthHeader(month = month, transactionCount = transactions.size)
+                }
+                items(transactions) { transaction ->
+                    TransactionItem(
+                        transaction = transaction,
+                        showName = showNames,
+                        showAmount = showAmounts
+                    )
+                }
+            }
         } else {
-            TransactionsListPaged(
-                items = pagedTransactions,
-                showNames = showNames,
-                showAmounts = showAmounts
-            )
+            // Paged view - add individual transactions
+            items(pagedTransactions.itemCount) { index ->
+                pagedTransactions[index]?.let { transaction ->
+                    TransactionItem(
+                        transaction = transaction,
+                        showName = showNames,
+                        showAmount = showAmounts
+                    )
+                }
+            }
+            
+            // Loading states for paged
+            when (pagedTransactions.loadState.append) {
+                is androidx.paging.LoadState.Loading -> {
+                    item { 
+                        Text(
+                            "Loading more…", 
+                            color = Color.Gray, 
+                            modifier = Modifier.padding(8.dp)
+                        ) 
+                    }
+                }
+                is androidx.paging.LoadState.Error -> {
+                    item { 
+                        Text(
+                            "Error loading", 
+                            color = Color.Red, 
+                            modifier = Modifier.padding(8.dp)
+                        ) 
+                    }
+                }
+                else -> {}
+            }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        // Empty state if no transactions
+        if ((useGroupedView && groupedTransactions.isEmpty()) || 
+            (!useGroupedView && pagedTransactions.itemCount == 0 && pagedTransactions.loadState.refresh !is androidx.paging.LoadState.Loading)) {
+            item {
+                EmptyTransactionsView()
+            }
+        }
         
         // 🔍 Function Call Inspector Panel
-        FunctionCallInspector(
-            viewModel = viewModel,
-            modifier = Modifier.fillMaxWidth()
-        )
+        item {
+            FunctionCallInspector(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 

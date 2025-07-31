@@ -3,6 +3,16 @@ package com.google.sample.fcdemo.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -185,10 +195,8 @@ private fun AgentAvatar(
     status: AgentStatus,
     modifier: Modifier = Modifier
 ) {
-    val emoji = when (agentType) {
-        AgentType.FINANCE_IQ -> "💎"
-        AgentType.SPEND_WISE -> "🧠"
-    }
+    // Enhanced avatar system with sophisticated animations
+    val infiniteTransition = rememberInfiniteTransition(label = "AgentAvatar")
     
     // Status indicator color
     val statusColor = when (status) {
@@ -201,39 +209,104 @@ private fun AgentAvatar(
         AgentStatus.HANDOFF -> Color.Magenta
     }
     
+    // Rotation animation for active states
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (status in listOf(AgentStatus.ACTIVE, AgentStatus.THINKING)) 360f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (status == AgentStatus.THINKING) 3000 else 4000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+    
+    // Pulsing scale animation
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (status == AgentStatus.ACTIVE) 1.1f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    
+    // Breathing effect for thinking state
+    val breathingScale by infiniteTransition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = if (status == AgentStatus.THINKING) 1.05f else 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 2000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathingScale"
+    )
+    
     Box(
-        modifier = modifier.size(48.dp),
+        modifier = modifier.size(56.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Agent Avatar Background
+        // Enhanced Avatar Background with animations
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
+                .graphicsLayer {
+                    rotationZ = if (agentType == AgentType.FINANCE_IQ && status == AgentStatus.ACTIVE) rotation else 0f
+                    scaleX = pulseScale
+                    scaleY = pulseScale
+                }
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            statusColor.copy(alpha = 0.3f),
-                            statusColor.copy(alpha = 0.1f)
+                            statusColor.copy(alpha = 0.4f),
+                            statusColor.copy(alpha = 0.1f),
+                            Color.Transparent
                         )
                     ),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // Emoji Avatar
-            Text(
-                text = emoji,
-                fontSize = 24.sp
-            )
+            // Agent-specific animated elements
+            when (agentType) {
+                AgentType.FINANCE_IQ -> {
+                    FinanceIQAvatar(
+                        status = status,
+                        statusColor = statusColor,
+                        rotation = rotation,
+                        scale = pulseScale
+                    )
+                }
+                AgentType.SPEND_WISE -> {
+                    SpendWiseAvatar(
+                        status = status,
+                        statusColor = statusColor,
+                        breathingScale = breathingScale
+                    )
+                }
+            }
         }
         
-        // Status Indicator Dot
+        // Enhanced Status Indicator with pulsing
         Box(
             modifier = Modifier
-                .size(12.dp)
+                .size(14.dp)
                 .align(Alignment.TopEnd)
+                .graphicsLayer {
+                    scaleX = if (status == AgentStatus.ACTIVE) pulseScale else 1f
+                    scaleY = if (status == AgentStatus.ACTIVE) pulseScale else 1f
+                }
                 .background(statusColor, CircleShape)
-                .padding(1.dp)
+                .padding(2.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -241,6 +314,169 @@ private fun AgentAvatar(
                     .background(Color.White, CircleShape)
             )
         }
+        
+        // Agent-specific animated indicators
+        when (agentType) {
+            AgentType.FINANCE_IQ -> {
+                if (status in listOf(AgentStatus.ACTIVE, AgentStatus.THINKING)) {
+                    // Magnifying glass indicator
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Analyzing",
+                        modifier = Modifier
+                            .size(12.dp)
+                            .align(Alignment.BottomStart)
+                            .graphicsLayer {
+                                rotationZ = rotation * 0.5f
+                                alpha = 0.8f
+                            },
+                        tint = Color.White
+                    )
+                }
+            }
+            AgentType.SPEND_WISE -> {
+                if (status == AgentStatus.THINKING) {
+                    // Thinking bubbles
+                    ThinkingBubbles(
+                        modifier = Modifier.align(Alignment.TopStart)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinanceIQAvatar(
+    status: AgentStatus,
+    statusColor: Color,
+    rotation: Float,
+    scale: Float
+) {
+    Box(
+        modifier = Modifier.size(40.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Diamond emoji with enhanced effects
+        Text(
+            text = "💎",
+            fontSize = 28.sp,
+            modifier = Modifier.graphicsLayer {
+                rotationZ = if (status == AgentStatus.ACTIVE) rotation * 0.3f else 0f
+            }
+        )
+        
+        // Extraction rays effect for active state
+        if (status == AgentStatus.ACTIVE) {
+            repeat(8) { index ->
+                Box(
+                    modifier = Modifier
+                        .size(2.dp, 16.dp)
+                        .graphicsLayer {
+                            rotationZ = (index * 45f) + (rotation * 0.2f)
+                            alpha = 0.6f
+                        }
+                        .background(
+                            statusColor.copy(alpha = 0.4f),
+                            RoundedCornerShape(1.dp)
+                        )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpendWiseAvatar(
+    status: AgentStatus,
+    statusColor: Color,
+    breathingScale: Float
+) {
+    Box(
+        modifier = Modifier.size(40.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Brain emoji with breathing effect
+        Text(
+            text = "🧠",
+            fontSize = 28.sp,
+            modifier = Modifier.graphicsLayer {
+                scaleX = if (status == AgentStatus.THINKING) breathingScale else 1f
+                scaleY = if (status == AgentStatus.THINKING) breathingScale else 1f
+            }
+        )
+        
+        // Neural network effect for thinking state
+        if (status == AgentStatus.THINKING) {
+            repeat(6) { index ->
+                Box(
+                    modifier = Modifier
+                        .size(1.dp, 8.dp)
+                        .graphicsLayer {
+                            rotationZ = index * 60f
+                            alpha = 0.3f + (breathingScale - 0.9f) * 2f
+                        }
+                        .background(
+                            statusColor.copy(alpha = 0.3f),
+                            RoundedCornerShape(0.5.dp)
+                        )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThinkingBubbles(
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ThinkingBubbles")
+    
+    val bubble1Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bubble1Alpha"
+    )
+    
+    val bubble2Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 0.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bubble2Alpha"
+    )
+    
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Small thinking bubble
+        Box(
+            modifier = Modifier
+                .size(3.dp)
+                .background(
+                    Color.White.copy(alpha = bubble1Alpha),
+                    CircleShape
+                )
+        )
+        
+        Spacer(modifier = Modifier.height(2.dp))
+        
+        // Medium thinking bubble
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .background(
+                    Color.White.copy(alpha = bubble2Alpha),
+                    CircleShape
+                )
+        )
     }
 }
 

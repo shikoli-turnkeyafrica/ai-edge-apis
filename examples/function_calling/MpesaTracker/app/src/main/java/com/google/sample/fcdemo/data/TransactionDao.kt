@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -19,6 +20,12 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
     fun getAllGrouped(): Flow<List<TransactionEntity>>
+
+    @Query("SELECT * FROM transactions WHERE transactionId = :transactionId LIMIT 1")
+    suspend fun getById(transactionId: String): TransactionEntity?
+
+    @Update
+    suspend fun update(transaction: TransactionEntity)
 
     @Query("SELECT EXISTS(SELECT 1 FROM transactions WHERE transactionId = :transactionId)")
     suspend fun exists(transactionId: String): Boolean

@@ -16,6 +16,7 @@ import com.google.ai.edge.localagents.fc.ModelFormatterOptions
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.google.mediapipe.tasks.genai.llminference.LlmInference.LlmInferenceOptions
 import com.google.sample.fcdemo.data.MpesaDatabase
+import com.google.sample.fcdemo.data.TransactionDao
 import com.google.sample.fcdemo.data.TransactionEntity
 import com.google.sample.fcdemo.functioncalling.MpesaTools
 import kotlinx.coroutines.withTimeout
@@ -58,6 +59,9 @@ class SmsProcessingWorker(
                 val duration = System.currentTimeMillis() - startTime
                 Log.i(TAG, "WorkManager: Model inference completed in ${duration}ms")
                 
+                // Update progress: AI inference complete
+                setProgress(workDataOf(PROGRESS_KEY to "🤖 AI inference complete..."))
+                
                 // Detailed logging of the model response
                 Log.d(TAG, "WorkManager: Model response candidates: ${response.candidatesCount}")
                 
@@ -90,8 +94,13 @@ class SmsProcessingWorker(
                     // Try to parse and save transaction
                     val parts = candidate.content.partsList
                     if (parts != null && parts.isNotEmpty()) {
+                        // Update progress: Extracting data
+                        setProgress(workDataOf(PROGRESS_KEY to "📊 Extracting transaction data..."))
+                        
                         parseAndSaveTransaction(parts, smsText)
-                        setProgress(workDataOf(PROGRESS_KEY to "Transaction saved"))
+                        
+                        // Update progress: Complete
+                        setProgress(workDataOf(PROGRESS_KEY to "✅ Transaction saved!"))
                         Log.i(TAG, "WorkManager: SMS processing completed successfully with AI function calling")
                         Result.success()
                     } else {
@@ -168,6 +177,9 @@ class SmsProcessingWorker(
                         return
                     }
 
+                    // Update progress: Saving to database
+                    setProgress(workDataOf(PROGRESS_KEY to "💾 Saving to database..."))
+
                     val transaction = TransactionEntity(
                         transactionId = transactionId,
                         direction = direction,
@@ -179,6 +191,9 @@ class SmsProcessingWorker(
                     
                     transactionDao.insert(transaction)
                     Log.i(TAG, "WorkManager: Successfully saved transaction: $transactionId")
+                    
+                    // Chain function call: Auto-categorize the transaction
+                    categorizeParsedTransaction(transactionId, counterparty, direction, amountStr.toDoubleOrNull() ?: 0.0, transactionDao)
                     return
                 } else {
                     Log.w(TAG, "WorkManager: Unexpected function call name: ${funcCall.name}")
@@ -225,5 +240,120 @@ class SmsProcessingWorker(
         )
     }
 
+    private fun createCategorizationModel(): GenerativeModel {
+        val formatter = HammerFormatter(
+            ModelFormatterOptions.builder().setAddPromptTemplate(true).build()
+        )
 
+        val llmInferenceOptions = LlmInferenceOptions.builder()
+            .setModelPath("/data/local/tmp/hammer2.1_1.5b_q8_ekv4096.task")
+            .setMaxTokens(2048)
+            .apply { setPreferredBackend(LlmInference.Backend.GPU) }
+            .build()
+
+        val llmInference = LlmInference.createFromOptions(applicationContext, llmInferenceOptions)
+        val llmInferenceBackend = LlmInferenceBackend(llmInference, formatter)
+
+        val categorizationSystemInstruction = Content.newBuilder()
+            .setRole("system")
+            .addParts(
+                Part.newBuilder()
+                    .setText("You are an assistant that categorizes M-PESA transactions. You MUST respond with a function call to 'categorize_transaction' with the category and confidence level. Always use function calls, never respond with plain text.")
+            )
+            .build()
+
+        return GenerativeModel(
+            llmInferenceBackend,
+            categorizationSystemInstruction,
+            listOf(MpesaTools.categorizationTool).toMutableList()
+        )
+    }
+
+    private suspend fun categorizeParsedTransaction(
+        transactionId: String,
+        counterparty: String,
+        direction: String,
+        amount: Double,
+        transactionDao: TransactionDao
+    ) {
+        try {
+            // Update progress: Categorizing
+            setProgress(workDataOf(PROGRESS_KEY to "🏷️ Auto-categorizing..."))
+            
+            Log.d(TAG, "WorkManager: Starting auto-categorization for transaction: $transactionId")
+            
+            // Create a separate AI model for categorization
+            val categorizationModel = createCategorizationModel()
+            val categorizationChat = categorizationModel.startChat()
+            
+            // Create categorization prompt
+            val categorizationPrompt = """
+                Categorize this M-PESA transaction:
+                - Transaction ID: $transactionId
+                - Counterparty: $counterparty
+                - Direction: $direction
+                - Amount: KSh$amount
+                
+                Based on the counterparty name, determine the most appropriate category and confidence level.
+            """.trimIndent()
+            
+            Log.d(TAG, "WorkManager: Sending categorization request: $categorizationPrompt")
+            
+            val categorizationResponse = withTimeout(60000L) { // 1 minute timeout
+                categorizationChat.sendMessage(categorizationPrompt)
+            }
+            
+            Log.d(TAG, "WorkManager: Categorization inference completed")
+            
+            // Process categorization response
+            if (categorizationResponse.candidatesCount > 0) {
+                val candidate = categorizationResponse.getCandidates(0)
+                candidate.content.partsList?.forEach { part ->
+                    if (part?.hasFunctionCall() == true && part.functionCall.name == "categorize_transaction") {
+                        val args = part.functionCall.args.fieldsMap
+                        val category = args["category"]?.stringValue ?: "other"
+                        val confidence = args["confidence"]?.stringValue ?: "low"
+                        
+                        Log.d(TAG, "WorkManager: Auto-categorization result - Category: $category, Confidence: $confidence")
+                        updateTransactionCategory(transactionId, category, confidence, transactionDao)
+                        return
+                    }
+                }
+            }
+            
+            Log.w(TAG, "WorkManager: No categorization function call found, using default category")
+            updateTransactionCategory(transactionId, "other", "low", transactionDao)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "WorkManager: Categorization failed: ${e.message}", e)
+            // Fallback to default category
+            updateTransactionCategory(transactionId, "other", "low", transactionDao)
+        }
+    }
+
+    private suspend fun updateTransactionCategory(
+        transactionId: String,
+        category: String,
+        confidence: String,
+        transactionDao: TransactionDao
+    ) {
+        try {
+            // Get the existing transaction
+            val existingTransaction = transactionDao.getById(transactionId)
+            if (existingTransaction != null) {
+                // Create updated transaction with category
+                val updatedTransaction = existingTransaction.copy(
+                    category = category,
+                    confidence = confidence
+                )
+                
+                transactionDao.update(updatedTransaction)
+                Log.i(TAG, "WorkManager: Updated transaction $transactionId with category: $category ($confidence confidence)")
+            } else {
+                Log.w(TAG, "WorkManager: Transaction $transactionId not found for category update")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "WorkManager: Failed to update transaction category: ${e.message}", e)
+        }
+    }
 } 

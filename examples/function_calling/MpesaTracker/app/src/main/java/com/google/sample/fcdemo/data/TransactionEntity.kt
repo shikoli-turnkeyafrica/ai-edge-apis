@@ -14,5 +14,8 @@ data class TransactionEntity(
     val dateTime: String = "unknown",
     val balanceAfter: Double? = null,
     val rawMessage: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    // Auto-categorization fields
+    val category: String? = null,
+    val confidence: String? = null
 ) 

@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TransactionEntity::class, EnvelopeEntity::class], 
-    version = 4, 
+    version = 5, 
     exportSchema = false
 )
 abstract class MpesaDatabase : RoomDatabase() {
@@ -63,6 +63,23 @@ abstract class MpesaDatabase : RoomDatabase() {
                 """.trimIndent())
             }
         }
+        
+        /**
+         * Migration from version 4 to 5: Add Suspense Account
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add Suspense Account as the central hub for all M-PESA transactions
+                val currentTime = System.currentTimeMillis()
+                database.execSQL("""
+                    INSERT INTO envelopes (envelopeId, displayName, description, budgetAmountKes, icon, color, sortOrder, createdAt, lastUpdated, budgetPeriodStart, allowOverspend) VALUES
+                    ('suspense', 'Suspense Account', 'Central hub - all M-PESA money flows through here before allocation', 0.0, '⚖️', '#607D8B', 0, $currentTime, $currentTime, $currentTime, 1)
+                """.trimIndent())
+                
+                // Update sort order of existing envelopes to make room for suspense at position 0
+                database.execSQL("UPDATE envelopes SET sortOrder = sortOrder + 1 WHERE envelopeId != 'suspense'")
+            }
+        }
 
         fun getDatabase(context: Context): MpesaDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -71,7 +88,7 @@ abstract class MpesaDatabase : RoomDatabase() {
                     MpesaDatabase::class.java,
                     "mpesa_database"
                 )
-                .addMigrations(MIGRATION_3_4)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                 .build()
                 INSTANCE = instance
                 instance

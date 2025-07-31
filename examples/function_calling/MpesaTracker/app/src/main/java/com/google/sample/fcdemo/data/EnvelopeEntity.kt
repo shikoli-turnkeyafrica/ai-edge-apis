@@ -80,6 +80,7 @@ enum class EnvelopeStatus {
  * Default envelope categories for initial setup
  */
 object DefaultEnvelopes {
+    val SUSPENSE = "suspense"        // Special: Central hub for all M-PESA flows
     val RENT = "rent"
     val GROCERIES = "groceries" 
     val TRANSPORT = "transport"
@@ -94,6 +95,17 @@ object DefaultEnvelopes {
      */
     fun getDefaultEnvelopes(): List<EnvelopeEntity> {
         return listOf(
+            // SUSPENSE ACCOUNT: Special envelope that receives all M-PESA transactions first
+            EnvelopeEntity(
+                envelopeId = SUSPENSE,
+                displayName = "Suspense Account",
+                description = "Central hub - all M-PESA money flows through here before allocation",
+                budgetAmountKes = 0.0,  // No budget limit for suspense account
+                icon = "⚖️",
+                color = "#607D8B",  // Neutral gray color
+                sortOrder = 0,      // Always first in list
+                allowOverspend = true  // Suspense can go negative (temporary state)
+            ),
             EnvelopeEntity(
                 envelopeId = RENT,
                 displayName = "Rent & Housing",

@@ -32,6 +32,7 @@ import com.google.sample.fcdemo.ui.components.AgentStatusCards
 import com.google.sample.fcdemo.ui.components.AgentPipeline
 import com.google.sample.fcdemo.ui.components.AgentChatSystem
 import com.google.sample.fcdemo.ui.components.FunctionCallInspector
+import com.google.sample.fcdemo.ui.components.ProcessingTheater
 import com.google.sample.fcdemo.ui.theme.glass
 import java.text.NumberFormat
 import java.util.*
@@ -100,6 +101,14 @@ fun MpesaTrackerScreen(
         // 💬 Agent Chat System
         item {
             AgentChatSystem(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        
+        // 🎬 Processing Theater (Split-screen view)
+        item {
+            ProcessingTheater(
                 viewModel = viewModel,
                 modifier = Modifier.fillMaxWidth()
             )

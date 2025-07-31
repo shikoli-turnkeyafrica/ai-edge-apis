@@ -388,6 +388,16 @@ class SmsProcessingWorker(
             transactionDao.insert(transaction)
             Log.i(TAG, "✅ Fallback: Successfully saved transaction: $transactionId")
             
+            // Update theater with structured data from fallback
+            val structuredDataFallback = mapOf(
+                "transaction_id" to transactionId,
+                "direction" to direction,
+                "amount_kes" to amountStr,
+                "counterparty" to counterparty,
+                "date_time" to dateTime
+            )
+            agentManager.updateSessionData(structuredDataFallback)
+            
             // Record successful fallback function call for inspector
             val functionInputs = mapOf(
                 "sms_message" to smsText,
@@ -530,6 +540,16 @@ class SmsProcessingWorker(
                         dateTime = dateTime,
                 rawMessage = rawMessage
             )
+            
+            // Update theater with structured data
+            val structuredData = mapOf(
+                "transaction_id" to transactionId,
+                "direction" to direction,
+                "amount_kes" to amountStr,
+                "counterparty" to counterparty,
+                "date_time" to dateTime
+            )
+            agentManager.updateSessionData(structuredData)
             
             transactionDao.insert(transaction)
             Log.i(TAG, "WorkManager: Successfully saved transaction: $transactionId")

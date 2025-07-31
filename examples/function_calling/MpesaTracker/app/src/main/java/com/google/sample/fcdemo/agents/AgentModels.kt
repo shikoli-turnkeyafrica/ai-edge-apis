@@ -85,7 +85,10 @@ data class CollaborationSession(
     val chatMessages: List<AgentChatMessage> = emptyList(),
     val timeline: List<TimelineEvent> = emptyList(),
     val success: Boolean = false,
-    val transactionId: String? = null
+    val transactionId: String? = null,
+    // Processing Theater data
+    val rawInput: String? = null,           // Raw SMS text for FinanceIQ view
+    val structuredData: Map<String, Any> = emptyMap()  // Extracted data for SpendWise view
 )
 
 // Agent Performance Metrics

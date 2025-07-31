@@ -73,7 +73,8 @@ class AgentManager private constructor() {
         
         val newSession = CollaborationSession(
             sessionId = sessionId,
-            startTime = System.currentTimeMillis()
+            startTime = System.currentTimeMillis(),
+            rawInput = smsContent  // Add raw SMS for theater view
         )
         
         _currentSession.value = newSession
@@ -154,6 +155,20 @@ class AgentManager private constructor() {
         val chatMessage = AgentChatMessage(agentType, message, isThinking = isThinking)
         _chatMessages.value = _chatMessages.value + chatMessage
         Log.d(TAG, "Chat - ${agentType.name}: $message")
+    }
+    
+    /**
+     * Update session with structured data for theater view
+     */
+    fun updateSessionData(structuredData: Map<String, Any>) {
+        val currentSession = _currentSession.value
+        if (currentSession != null) {
+            val updatedSession = currentSession.copy(
+                structuredData = structuredData
+            )
+            _currentSession.value = updatedSession
+            Log.d(TAG, "Updated session with structured data: ${structuredData.keys}")
+        }
     }
     
     /**

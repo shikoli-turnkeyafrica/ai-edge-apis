@@ -1,0 +1,52 @@
+# Build outputs
+build/
+app/build/
+*.apk
+*.aab
+*.ipa
+*.dex
+*.class
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration files
+local.properties
+keystore.properties
+
+# Machine Learning Models (store in cloud storage/LFS)
+*.task
+*.model
+*.onnx
+*.tflite
+*.pb
+*.bin
+*.safetensors
+*.h5
+*.pth
+*.pt
+*.ckpt
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Logs
+*.log

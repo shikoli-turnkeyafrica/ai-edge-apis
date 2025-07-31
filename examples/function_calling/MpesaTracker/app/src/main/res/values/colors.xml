@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CashFlow Modern Financial Theme -->
+    <color name="cashflow_primary">#FF00C853</color>        <!-- Bright Green -->
+    <color name="cashflow_primary_dark">#FF00A844</color>   <!-- Dark Green -->
+    <color name="cashflow_secondary">#FF1976D2</color>      <!-- Blue -->
+    <color name="cashflow_background">#FF121212</color>     <!-- Dark Background -->
+    <color name="cashflow_surface">#FF1E1E1E</color>       <!-- Card Background -->
+    <color name="cashflow_accent">#FF4CAF50</color>        <!-- Light Green Accent -->
+    
+    <!-- Transaction Colors -->
+    <color name="money_sent">#FFFF5722</color>             <!-- Orange for sent money -->
+    <color name="money_received">#FF4CAF50</color>         <!-- Green for received money -->
+    
+    <!-- Legacy colors (keeping for compatibility) -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- WealthWise theme -->
+    <color name="wealthwise_grad_start">#002E2B</color>
+    <color name="wealthwise_grad_end">#003C5F</color>
+</resources>

@@ -22,6 +22,7 @@ import com.google.sample.fcdemo.agents.ProcessingStage
 import com.google.sample.fcdemo.data.MpesaDatabase
 import com.google.sample.fcdemo.data.TransactionDao
 import com.google.sample.fcdemo.data.TransactionEntity
+import com.google.sample.fcdemo.envelope.EnvelopeManager
 import com.google.sample.fcdemo.functioncalling.MpesaTools
 import kotlinx.coroutines.withTimeout
 
@@ -448,6 +449,46 @@ class SmsProcessingWorker(
             val updatedTransaction = transaction.copy(category = category, confidence = "medium")
             transactionDao.update(updatedTransaction)
             
+            // 🎯 ENVELOPE ALLOCATION: Allocate fallback transaction to appropriate envelope
+            try {
+                val envelopeManager = EnvelopeManager.getInstance(applicationContext) 
+                val allocationResult = envelopeManager.allocateTransaction(
+                    transactionId = transactionId,
+                    category = category,
+                    amount = amountStr.toDoubleOrNull() ?: 0.0,
+                    direction = direction,
+                    counterparty = counterparty
+                )
+                
+                if (allocationResult.success) {
+                    Log.i(TAG, "💰 Fallback envelope allocation successful: ${allocationResult.message}")
+                    agentManager.addChatMessage(
+                        AgentType.SPEND_WISE,
+                        "💰 Allocated to ${allocationResult.envelopeName}: ${allocationResult.message}"
+                    )
+                    
+                    // Check for warnings
+                    when (allocationResult.warningLevel) {
+                        com.google.sample.fcdemo.envelope.WarningLevel.WARNING,
+                        com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> {
+                            agentManager.addChatMessage(
+                                AgentType.SPEND_WISE,
+                                "⚠️ Budget Alert: ${allocationResult.message}"
+                            )
+                        }
+                        else -> {}
+                    }
+                } else {
+                    Log.w(TAG, "⚠️ Fallback envelope allocation failed: ${allocationResult.message}")
+                    agentManager.addChatMessage(
+                        AgentType.SPEND_WISE,
+                        "⚠️ Could not allocate to envelope: ${allocationResult.message}"
+                    )
+                }
+            } catch (envelopeError: Exception) {
+                Log.e(TAG, "❌ Fallback envelope allocation error: ${envelopeError.message}", envelopeError)
+            }
+            
             agentManager.updateSpendWiseState(
                 status = AgentStatus.COMPLETE,
                 message = "Category: $category",
@@ -733,6 +774,60 @@ ABSOLUTELY NO PLAIN TEXT RESPONSES. ONLY FUNCTION CALLS.
                 
                 transactionDao.update(updatedTransaction)
                 Log.i(TAG, "WorkManager: Updated transaction $transactionId with category: $category ($confidence confidence)")
+                
+                // 🎯 ENVELOPE ALLOCATION: Allocate transaction to appropriate envelope
+                try {
+                    setProgress(workDataOf(PROGRESS_KEY to "💰 Allocating to envelope..."))
+                    
+                    val envelopeManager = EnvelopeManager.getInstance(applicationContext)
+                    val allocationResult = envelopeManager.allocateTransaction(
+                        transactionId = transactionId,
+                        category = category,
+                        amount = existingTransaction.amountKes,
+                        direction = existingTransaction.direction,
+                        counterparty = existingTransaction.counterparty
+                    )
+                    
+                    if (allocationResult.success) {
+                        Log.i(TAG, "💰 Envelope allocation successful: ${allocationResult.message}")
+                        
+                        // Update agent manager with envelope information
+                        agentManager.addChatMessage(
+                            AgentType.SPEND_WISE, 
+                            "💰 Allocated to ${allocationResult.envelopeName}: ${allocationResult.message}"
+                        )
+                        
+                        // Check for warnings and notify agents
+                        when (allocationResult.warningLevel) {
+                            com.google.sample.fcdemo.envelope.WarningLevel.WARNING,
+                            com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> {
+                                agentManager.addChatMessage(
+                                    AgentType.SPEND_WISE,
+                                    "⚠️ Budget Alert: ${allocationResult.message}"
+                                )
+                                Log.w(TAG, "⚠️ Envelope warning: ${allocationResult.message}")
+                            }
+                            else -> {
+                                Log.d(TAG, "✅ Envelope allocation completed normally")
+                            }
+                        }
+                        
+                    } else {
+                        Log.w(TAG, "⚠️ Envelope allocation failed: ${allocationResult.message}")
+                        agentManager.addChatMessage(
+                            AgentType.SPEND_WISE,
+                            "⚠️ Could not allocate to envelope: ${allocationResult.message}"
+                        )
+                    }
+                    
+                } catch (envelopeError: Exception) {
+                    Log.e(TAG, "❌ Envelope allocation error: ${envelopeError.message}", envelopeError)
+                    agentManager.addChatMessage(
+                        AgentType.SPEND_WISE,
+                        "❌ Envelope system error: ${envelopeError.message}"
+                    )
+                }
+                
             } else {
                 Log.w(TAG, "WorkManager: Transaction $transactionId not found for category update")
             }

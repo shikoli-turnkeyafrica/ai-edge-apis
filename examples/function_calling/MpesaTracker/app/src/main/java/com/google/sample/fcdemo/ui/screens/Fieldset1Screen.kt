@@ -42,6 +42,7 @@ import com.google.sample.fcdemo.viewmodel.fetchFlow
 
 const val TAG = "Fieldset1Screen"
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 fun Fieldset1Screen(
     viewModel: FormViewModel,
@@ -128,6 +129,7 @@ fun Fieldset1Screen(
     )
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 internal fun Fieldset1Content(
     firstName: String,
@@ -257,6 +259,7 @@ internal fun Fieldset1Content(
     }
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Preview("Fieldset1 Preview Preview")
 @Composable
 fun PreviewFieldset1Content() {

@@ -34,6 +34,7 @@ import com.google.sample.fcdemo.R
 import com.google.sample.fcdemo.navigation.MedicalFormNavigationActions
 import com.google.sample.fcdemo.viewmodel.FormViewModel
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 fun HomeScreen(
     viewModel: FormViewModel,

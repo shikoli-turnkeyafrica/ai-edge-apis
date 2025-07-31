@@ -46,6 +46,7 @@ import com.google.sample.fcdemo.viewmodel.fetchFlow
 
 const val NOT_PROVIDED = "Not provided"
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 fun SummaryScreen(
     viewModel: FormViewModel,
@@ -93,6 +94,7 @@ fun SummaryScreen(
     )
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 internal fun SummaryContent(
     fieldsetMaps: MutableMap<String, MutableMap<String, String>>,
@@ -272,6 +274,7 @@ fun formDataValue(viewModel: FormViewModel, label: String): String {
     return value.toString()
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Preview("Fieldset3 Preview")
 @Composable
 fun PreviewSummaryContent() {

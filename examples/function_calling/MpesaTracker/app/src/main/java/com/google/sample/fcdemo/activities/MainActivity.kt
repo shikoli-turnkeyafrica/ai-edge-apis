@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+@androidx.paging.ExperimentalPagingApi
 class MainActivity : ComponentActivity() {
 
     private val permissionsToRequest = arrayOf(

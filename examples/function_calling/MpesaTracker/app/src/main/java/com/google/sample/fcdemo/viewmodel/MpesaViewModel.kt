@@ -119,4 +119,23 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
             Log.i("MpesaViewModel", "=== END WORKMANAGER DEBUG ===")
         }
     }
+    
+    // Debug method to manually test SMS processing
+    fun debugProcessTestSms() {
+        val testSms = "TGV2D1J8P6 Confirmed.You have received Ksh20.00 from GILBERT  MAKATIANI 0725484223 on 31/7/25 at 9:41 PM  New M-PESA balance is Ksh120.00. Earn interest daily on Ziidi MMF,Dial *334#"
+        
+        Log.i("MpesaViewModel", "=== MANUAL SMS TEST ===")
+        Log.i("MpesaViewModel", "Testing SMS: $testSms")
+        
+        // Queue SMS processing work
+        val inputData = androidx.work.workDataOf("sms_text" to testSms)
+        val smsWork = androidx.work.OneTimeWorkRequestBuilder<com.google.sample.fcdemo.workers.SmsProcessingWorker>()
+            .setInputData(inputData)
+            .addTag("mpesa_sms_processing")
+            .addTag("manual_test")
+            .build()
+        
+        workManager.enqueue(smsWork)
+        Log.i("MpesaViewModel", "Manual SMS processing work enqueued with ID: ${smsWork.id}")
+    }
 } 

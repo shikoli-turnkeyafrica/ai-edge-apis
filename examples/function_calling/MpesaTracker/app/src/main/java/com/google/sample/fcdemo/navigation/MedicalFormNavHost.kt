@@ -37,6 +37,7 @@ sealed class Destination {
     object Summary : Destination()
 }
 
+@androidx.paging.ExperimentalPagingApi
 class MedicalFormNavigationActions(navController: NavHostController, activity: MainActivity) {
     val exitApplication: () -> Unit = {
         activity.finish()
@@ -96,6 +97,7 @@ class MedicalFormNavigationActions(navController: NavHostController, activity: M
     }
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 fun MedicalFormNavHost(formViewModel: FormViewModel) {
     val activity = LocalActivity.current as MainActivity

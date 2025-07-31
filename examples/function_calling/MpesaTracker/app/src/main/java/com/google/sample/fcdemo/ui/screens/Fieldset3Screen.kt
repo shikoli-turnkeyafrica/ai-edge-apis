@@ -33,6 +33,7 @@ import com.google.sample.fcdemo.utilities.SpeechRecognitionResult
 import com.google.sample.fcdemo.viewmodel.FormViewModel
 import com.google.sample.fcdemo.viewmodel.fetchFlow
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 fun Fieldset3Screen(
     viewModel: FormViewModel,
@@ -75,6 +76,7 @@ fun Fieldset3Screen(
     )
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 internal fun Fieldset3Content(
     medicalConditions: Map<String, Boolean>,
@@ -151,6 +153,7 @@ internal fun Fieldset3Content(
     }
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Preview("Fieldset3 Preview")
 @Composable
 fun PreviewFieldset3Content() {

@@ -34,6 +34,7 @@ import com.google.sample.fcdemo.utilities.SpeechRecognitionResult
 import com.google.sample.fcdemo.viewmodel.FormViewModel
 import com.google.sample.fcdemo.viewmodel.fetchFlow
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 fun Fieldset2Screen(
     viewModel: FormViewModel,
@@ -80,6 +81,7 @@ fun Fieldset2Screen(
     )
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Composable
 internal fun Fieldset2Content(
     sex: String?,
@@ -168,6 +170,7 @@ internal fun Fieldset2Content(
     }
 }
 
+@androidx.paging.ExperimentalPagingApi
 @Preview("Fieldset2 Preview")
 @Composable
 fun PreviewFieldset2Content() {

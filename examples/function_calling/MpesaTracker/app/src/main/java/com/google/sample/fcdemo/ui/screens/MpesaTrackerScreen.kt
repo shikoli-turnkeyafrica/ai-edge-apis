@@ -28,6 +28,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.sample.fcdemo.R
 import com.google.sample.fcdemo.data.TransactionEntity
 import com.google.sample.fcdemo.viewmodel.MpesaViewModel
+import com.google.sample.fcdemo.ui.components.AgentStatusCards
+import com.google.sample.fcdemo.ui.components.AgentPipeline
+import com.google.sample.fcdemo.ui.components.AgentChatSystem
+import com.google.sample.fcdemo.ui.components.FunctionCallInspector
 import com.google.sample.fcdemo.ui.theme.glass
 import java.text.NumberFormat
 import java.util.*
@@ -72,6 +76,30 @@ fun MpesaTrackerScreen(
         CashFlowHeader()
         Spacer(modifier = Modifier.height(16.dp))
         
+        // 🤖 EdgeFinance AI Agents Status Cards
+        AgentStatusCards(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // 🔄 Agent Processing Pipeline
+        AgentPipeline(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // 💬 Agent Chat System
+        AgentChatSystem(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // Privacy and View toggles
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -92,6 +120,30 @@ fun MpesaTrackerScreen(
                 useGroupedView = useGroupedView,
                 onToggleView = { useGroupedView = !useGroupedView }
             )
+            
+            // 🎭 Agent Demo Button
+            Card(
+                modifier = Modifier
+                    .weight(0.8f)
+                    .glass(),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(0.dp),
+                onClick = { viewModel.startAgentDemo() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "🤖 Demo",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -116,6 +168,14 @@ fun MpesaTrackerScreen(
                 showAmounts = showAmounts
             )
         }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // 🔍 Function Call Inspector Panel
+        FunctionCallInspector(
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

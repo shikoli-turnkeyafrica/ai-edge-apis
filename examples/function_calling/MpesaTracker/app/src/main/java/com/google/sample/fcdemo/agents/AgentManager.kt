@@ -31,7 +31,7 @@ class AgentManager private constructor() {
         AgentState(
             type = AgentType.FINANCE_IQ,
             status = AgentStatus.IDLE,
-            message = "Ready to extract transaction data"
+            message = ""  // Empty to allow dynamic rotation
         )
     )
     val financeIQState: StateFlow<AgentState> = _financeIQState.asStateFlow()
@@ -40,7 +40,7 @@ class AgentManager private constructor() {
         AgentState(
             type = AgentType.SPEND_WISE,
             status = AgentStatus.IDLE,
-            message = "Ready to categorize transactions"
+            message = ""  // Empty to allow dynamic rotation
         )
     )
     val spendWiseState: StateFlow<AgentState> = _spendWiseState.asStateFlow()
@@ -226,9 +226,9 @@ class AgentManager private constructor() {
         // Update stats
         updateEdgeAIStats(completedSession)
         
-        // Reset agents to idle
-        updateFinanceIQState(AgentStatus.IDLE, "Ready for next transaction", 0f)
-        updateSpendWiseState(AgentStatus.IDLE, "Ready for next transaction", 0f)
+        // Reset agents to idle (empty message allows dynamic rotation)
+        updateFinanceIQState(AgentStatus.IDLE, "", 0f)
+        updateSpendWiseState(AgentStatus.IDLE, "", 0f)
         
         addTimelineEvent(TimelineEvent(ProcessingStage.COMPLETE, details = "Session completed successfully"))
         

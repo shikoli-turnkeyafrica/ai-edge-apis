@@ -143,7 +143,7 @@ private fun AgentCard(
             
             // Status Message
             Text(
-                text = agentState.message.ifBlank { getDefaultMessage(agentState.status) },
+                text = agentState.message.ifBlank { getDefaultMessage(agentState.status, agentState.type) },
                 fontSize = 11.sp,
                 color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
@@ -521,19 +521,47 @@ private fun getAgentDisplayName(agentType: AgentType): String {
 
 private fun getAgentSpecialty(agentType: AgentType): String {
     return when (agentType) {
-        AgentType.FINANCE_IQ -> "Transaction\nExtraction"
-        AgentType.SPEND_WISE -> "Financial\nCategorization"
+        AgentType.FINANCE_IQ -> "Money-Sense\nAI Agent"
+        AgentType.SPEND_WISE -> "Spending Coach\nAI Agent"
     }
 }
 
-private fun getDefaultMessage(status: AgentStatus): String {
+private fun getDefaultMessage(status: AgentStatus, agentType: AgentType): String {
     return when (status) {
-        AgentStatus.IDLE -> "Ready for next task"
+        AgentStatus.IDLE -> getDynamicIdleMessage(agentType)
         AgentStatus.INITIALIZING -> "Starting up..."
         AgentStatus.ACTIVE -> "Processing data..."
         AgentStatus.THINKING -> "Analyzing..."
         AgentStatus.COMPLETE -> "Task completed!"
         AgentStatus.ERROR -> "Error occurred"
         AgentStatus.HANDOFF -> "Passing data..."
+    }
+}
+
+/**
+ * 🎭 Dynamic rotating flavor text for idle agents
+ * Cycles through engaging messages to show agent personality
+ */
+private fun getDynamicIdleMessage(agentType: AgentType): String {
+    val currentTime = System.currentTimeMillis()
+    val cycleIndex = ((currentTime / 3000) % 3).toInt() // Rotate every 3 seconds
+    
+    return when (agentType) {
+        AgentType.FINANCE_IQ -> {
+            val messages = arrayOf(
+                "Standing by for your next M-PESA SMS",
+                "Primed to scan the next receipt", 
+                "Ready to spot fresh cash-flow"
+            )
+            messages[cycleIndex]
+        }
+        AgentType.SPEND_WISE -> {
+            val messages = arrayOf(
+                "Waiting to tag your next spend",
+                "Prepared to sort the next shilling",
+                "Poised to file new expenses"
+            )
+            messages[cycleIndex]
+        }
     }
 }

@@ -16,6 +16,7 @@ import com.google.sample.fcdemo.agents.EdgeAIStats
 import com.google.sample.fcdemo.data.MpesaDatabase
 import com.google.sample.fcdemo.data.TransactionDao
 import com.google.sample.fcdemo.data.TransactionEntity
+import com.google.sample.fcdemo.envelope.EnvelopeManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,9 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
     
     // EdgeFinance AI Agents Manager
     private val agentManager = AgentManager.getInstance()
+    
+    // Envelope budgeting system
+    private val envelopeManager = EnvelopeManager.getInstance(application)
 
     // Database transactions flow
     val transactions: Flow<List<TransactionEntity>>
@@ -78,6 +82,14 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
     
     // EdgeAI Performance Stats
     val edgeAIStats: StateFlow<EdgeAIStats> = agentManager.edgeAIStats
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ⚖️ SUSPENSE ACCOUNT - Balance Tracking
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    // Suspense Account Balance 
+    private val _suspenseBalance = MutableStateFlow(0.0)
+    val suspenseBalance: StateFlow<Double> = _suspenseBalance.asStateFlow()
 
     init {
         transactionDao = MpesaDatabase.getDatabase(application).transactionDao()
@@ -106,6 +118,9 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
         
         // Monitor WorkManager for SMS processing jobs
         monitorWorkManager()
+        
+        // Load initial suspense account balance
+        refreshSuspenseBalance()
     }
     
     private fun monitorWorkManager() {
@@ -254,5 +269,28 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
         Log.i("MpesaViewModel", "Function Calls: ${functionCalls.value.size}")
         Log.i("MpesaViewModel", "Timeline Events: ${processingTimeline.value.size}")
         Log.i("MpesaViewModel", "=== END AGENT DEBUG ===")
+    }
+    
+    /**
+     * Refresh Suspense Account balance from database
+     */
+    private fun refreshSuspenseBalance() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val balance = envelopeManager.getSuspenseAccountBalance()
+                _suspenseBalance.value = balance
+                Log.d("MpesaViewModel", "⚖️ Suspense Account balance updated: KSh$balance")
+            } catch (e: Exception) {
+                Log.e("MpesaViewModel", "❌ Error refreshing suspense balance: ${e.message}", e)
+                _suspenseBalance.value = 0.0
+            }
+        }
+    }
+    
+    /**
+     * Public method to refresh suspense balance (called after transactions)
+     */
+    fun updateSuspenseBalance() {
+        refreshSuspenseBalance()
     }
 } 

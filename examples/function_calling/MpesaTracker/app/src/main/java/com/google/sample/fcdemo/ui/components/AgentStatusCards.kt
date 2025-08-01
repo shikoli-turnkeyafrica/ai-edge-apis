@@ -49,14 +49,16 @@ fun AgentStatusCards(
 ) {
     val financeIQState by viewModel.financeIQState.collectAsStateWithLifecycle()
     val spendWiseState by viewModel.spendWiseState.collectAsStateWithLifecycle()
+    val suspenseBalance by viewModel.suspenseBalance.collectAsStateWithLifecycle()
     
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // FinanceIQ Agent Card
+        // FinanceIQ Agent Card (with Suspense Account balance)
         AgentCard(
             agentState = financeIQState,
+            suspenseBalance = suspenseBalance,
             modifier = Modifier.weight(1f),
             onClick = { viewModel.debugAgentStates() }
         )
@@ -64,6 +66,7 @@ fun AgentStatusCards(
         // SpendWise Agent Card
         AgentCard(
             agentState = spendWiseState,
+            suspenseBalance = null, // SpendWise doesn't show suspense balance
             modifier = Modifier.weight(1f),
             onClick = { viewModel.debugAgentStates() }
         )
@@ -74,6 +77,7 @@ fun AgentStatusCards(
 @Composable
 private fun AgentCard(
     agentState: AgentState,
+    suspenseBalance: Double? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
@@ -151,6 +155,47 @@ private fun AgentCard(
                 minLines = 2,
                 maxLines = 2
             )
+            
+            // Suspense Account Balance (only for FinanceIQ)
+            suspenseBalance?.let { balance ->
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF607D8B).copy(alpha = 0.3f) // Suspense color
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "⚖️",
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = "Suspense",
+                                fontSize = 9.sp,
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Text(
+                            text = "KSh ${String.format("%.2f", balance)}",
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
             
@@ -549,17 +594,17 @@ private fun getDynamicIdleMessage(agentType: AgentType): String {
     return when (agentType) {
         AgentType.FINANCE_IQ -> {
             val messages = arrayOf(
-                "Standing by for your next M-PESA SMS",
-                "Primed to scan the next receipt", 
-                "Ready to spot fresh cash-flow"
+                "Ready to route income to Suspense Account",
+                "Standing by to extract M-PESA data", 
+                "Primed to channel cash-flow through Suspense"
             )
             messages[cycleIndex]
         }
         AgentType.SPEND_WISE -> {
             val messages = arrayOf(
-                "Waiting to tag your next spend",
-                "Prepared to sort the next shilling",
-                "Poised to file new expenses"
+                "Ready to allocate to your budget envelopes",
+                "Standing by to track envelope spending",
+                "Poised to monitor your budget limits"
             )
             messages[cycleIndex]
         }

@@ -13,10 +13,12 @@ import com.google.sample.fcdemo.agents.FunctionCall
 import com.google.sample.fcdemo.agents.TimelineEvent
 import com.google.sample.fcdemo.agents.CollaborationSession
 import com.google.sample.fcdemo.agents.EdgeAIStats
+import com.google.sample.fcdemo.data.EnvelopeEntity
 import com.google.sample.fcdemo.data.MpesaDatabase
 import com.google.sample.fcdemo.data.TransactionDao
 import com.google.sample.fcdemo.data.TransactionEntity
 import com.google.sample.fcdemo.envelope.EnvelopeManager
+import com.google.sample.fcdemo.envelope.EnvelopeTransferResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -120,13 +122,14 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        // Debug: Log what's in the database on startup
+        // 🔧 STARTUP FIX: Clear WorkManager backlog to prevent auto-analysis
+        clearWorkManagerBacklog()
+        
+        // Debug: Log what's in the database on startup (reduced verbosity)
         viewModelScope.launch(Dispatchers.IO) {
             val existingTransactions = transactionDao.getAllSync()
             Log.i("MpesaViewModel", "Database initialized with ${existingTransactions.size} existing transactions")
-            existingTransactions.forEach { transaction ->
-                Log.d("MpesaViewModel", "Existing transaction: ${transaction.transactionId} - ${transaction.direction} KSh${transaction.amountKes}")
-            }
+            // Removed individual transaction logging to reduce startup overhead
         }
         
         // Monitor WorkManager for SMS processing jobs
@@ -139,6 +142,22 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
         initializeEnvelopesIfNeeded()
     }
     
+    /**
+     * 🔧 STARTUP FIX: Clear WorkManager backlog
+     * Prevents automatic analysis on startup due to queued jobs
+     */
+    private fun clearWorkManagerBacklog() {
+        viewModelScope.launch {
+            try {
+                // Cancel all pending/enqueued SMS processing work
+                workManager.cancelAllWorkByTag("mpesa_sms_processing")
+                Log.i("MpesaViewModel", "🔧 Cleared WorkManager backlog to prevent auto-analysis on startup")
+            } catch (e: Exception) {
+                Log.w("MpesaViewModel", "Failed to clear WorkManager backlog: ${e.message}")
+            }
+        }
+    }
+
     private fun monitorWorkManager() {
         viewModelScope.launch {
             workManager.getWorkInfosByTagLiveData("mpesa_sms_processing").observeForever { workInfos ->
@@ -150,9 +169,18 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
                     Log.d("MpesaViewModel", "Work progress: $progress")
                 }
                 
-                // Log work status
-                workInfos.forEach { workInfo ->
-                    Log.d("MpesaViewModel", "Work ${workInfo.id}: ${workInfo.state}")
+                // 🔧 SUSPENSE BALANCE FIX: Check for suspense refresh trigger
+                activeWork?.progress?.getString("suspense_refresh")?.let { refresh ->
+                    if (refresh == "true") {
+                        Log.i("MpesaViewModel", "🔄 Triggering suspense balance refresh after envelope allocation")
+                        refreshSuspenseBalance()
+                    }
+                }
+                
+                // Reduced logging - only log running work to prevent spam
+                val runningWork = workInfos.filter { it.state == WorkInfo.State.RUNNING }
+                if (runningWork.isNotEmpty()) {
+                    Log.d("MpesaViewModel", "Active work: ${runningWork.size} jobs running")
                 }
             }
         }
@@ -335,6 +363,87 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 Log.e("MpesaViewModel", "Error initializing envelopes: ${e.message}", e)
             }
+        }
+    }
+    
+    /**
+     * Create a new custom envelope
+     */
+    fun createNewEnvelope(
+        name: String,
+        icon: String,
+        budgetAmount: Double,
+        color: String = "#4CAF50"
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val database = MpesaDatabase.getDatabase(getApplication())
+                val envelopeDao = database.envelopeDao()
+                
+                // Generate unique envelope ID
+                val envelopeId = "custom_${UUID.randomUUID().toString().take(8)}"
+                
+                // Get current max sort order and add 1
+                val existingEnvelopes = envelopeDao.getAllEnvelopesList()
+                val maxSortOrder = existingEnvelopes.maxOfOrNull { it.sortOrder } ?: 0
+                
+                // Create new envelope entity
+                val newEnvelope = EnvelopeEntity(
+                    envelopeId = envelopeId,
+                    displayName = name.trim(),
+                    budgetAmountKes = budgetAmount,
+                    currentBalanceKes = 0.0,
+                    spentAmountKes = 0.0,
+                    icon = icon,
+                    color = color,
+                    sortOrder = maxSortOrder + 1,
+                    allowOverspend = false,
+                    isActive = true,
+                    isOverspent = false,
+                    budgetPeriodStart = System.currentTimeMillis(),
+                    lastUpdated = System.currentTimeMillis()
+                )
+                
+                // Insert into database
+                envelopeDao.insertEnvelope(newEnvelope)
+                
+                Log.i("MpesaViewModel", "✅ Created new envelope: $name ($envelopeId) with budget KSh$budgetAmount")
+                
+            } catch (e: Exception) {
+                Log.e("MpesaViewModel", "Error creating new envelope: ${e.message}", e)
+            }
+        }
+    }
+    
+    /**
+     * Transfer money between envelopes
+     */
+    suspend fun transferBetweenEnvelopes(
+        fromEnvelopeId: String,
+        toEnvelopeId: String,
+        amount: Double
+    ): EnvelopeTransferResult {
+        return try {
+            envelopeManager.transferBetweenEnvelopes(fromEnvelopeId, toEnvelopeId, amount)
+        } catch (e: Exception) {
+            Log.e("MpesaViewModel", "Error transferring between envelopes: ${e.message}", e)
+            EnvelopeTransferResult(
+                success = false,
+                message = "Transfer failed: ${e.message}"
+            )
+        }
+    }
+    
+    /**
+     * Get envelope by ID for validation
+     */
+    suspend fun getEnvelopeById(envelopeId: String): EnvelopeEntity? {
+        return try {
+            val database = MpesaDatabase.getDatabase(getApplication())
+            database.envelopeDao().getEnvelopeById(envelopeId)
+        } catch (e: Exception) {
+            Log.e("MpesaViewModel", "Error getting envelope by ID: ${e.message}", e)
+            null
         }
     }
 } 

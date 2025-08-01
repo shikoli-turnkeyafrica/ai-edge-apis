@@ -215,7 +215,7 @@ class SmsProcessingWorker(
                         // Update progress: Complete
                         setProgress(workDataOf(PROGRESS_KEY to "✅ Transaction saved!"))
                         Log.i(TAG, "WorkManager: SMS processing completed successfully with AI function calling")
-                        Result.success()
+                Result.success()
                     } else {
                         Log.e(TAG, "WorkManager: No content parts in model response")
                         
@@ -245,41 +245,26 @@ class SmsProcessingWorker(
                     Result.failure()
                 }
                 
-            } catch (functionCallException: com.google.ai.edge.localagents.fc.FunctionCallException) {
+                        } catch (functionCallException: com.google.ai.edge.localagents.fc.FunctionCallException) {
                 Log.e(TAG, "WorkManager: FunctionCallException occurred")
                 Log.e(TAG, "WorkManager: Exception message: ${functionCallException.message}")
                 Log.e(TAG, "WorkManager: Exception cause: ${functionCallException.cause}")
                 functionCallException.printStackTrace()
                 
-                // 🔄 FALLBACK: Try to parse model text response manually
-                Log.i(TAG, "🔄 Attempting fallback text parsing...")
-                agentManager.addChatMessage(AgentType.FINANCE_IQ, "⚠️ Function call failed, trying text-based parsing...")
+                // 🚫 NO FALLBACK: AI function calling must work
+                Log.e(TAG, "❌ AI function calling failed - this needs to be fixed, not bypassed")
                 
-                try {
-                    // Try to get the raw response and parse it manually
-                    val fallbackResult = attemptTextBasedParsing(smsText, startTime)
-                    if (fallbackResult) {
-                        Log.i(TAG, "✅ Fallback parsing successful!")
-                        agentManager.addChatMessage(AgentType.FINANCE_IQ, "✅ Fallback parsing succeeded!")
-                Result.success()
-                    } else {
-                        throw Exception("Fallback parsing also failed")
-                    }
-                } catch (fallbackException: Exception) {
-                    Log.e(TAG, "Fallback parsing failed: ${fallbackException.message}")
-                    
-                    // Update FinanceIQ Agent with function call error
-                    agentManager.updateFinanceIQState(
-                        status = AgentStatus.ERROR,
-                        message = "Function call & fallback failed",
-                        progress = 0f
-                    )
-                    agentManager.addChatMessage(AgentType.FINANCE_IQ, "❌ Both AI function call and fallback parsing failed")
-                    agentManager.addTimelineEvent(com.google.sample.fcdemo.agents.TimelineEvent(ProcessingStage.COMPLETE, details = "Failed: Function calling and fallback failed"))
-                    agentManager.completeSession(success = false)
-                    
-                    Result.failure()
-                }
+                // Update FinanceIQ Agent with function call error
+                agentManager.updateFinanceIQState(
+                    status = AgentStatus.ERROR,
+                    message = "AI function call failed",
+                    progress = 0f
+                )
+                agentManager.addChatMessage(AgentType.FINANCE_IQ, "❌ AI function calling failed - system needs attention")
+                agentManager.addTimelineEvent(com.google.sample.fcdemo.agents.TimelineEvent(ProcessingStage.COMPLETE, details = "Failed: AI function calling error"))
+                agentManager.completeSession(success = false)
+                
+                Result.failure()
                 
             } catch (e: Exception) {
                 Log.e(TAG, "WorkManager: Unexpected error during AI processing: ${e.message}")
@@ -314,203 +299,8 @@ class SmsProcessingWorker(
         }
     }
 
-    /**
-     * 🔄 Fallback text-based SMS parsing when function calling fails
-     */
-    private suspend fun attemptTextBasedParsing(smsText: String, startTime: Long): Boolean {
-        Log.i(TAG, "🔄 Starting fallback text-based parsing for: $smsText")
-        
-        try {
-            // Common M-PESA patterns
-            val transactionIdRegex = """([A-Z0-9]{10})\s+Confirmed""".toRegex()
-            val amountRegex = """Ksh([\d,]+\.?\d*)""".toRegex()
-            val dateTimeRegex = """on\s+(\d{1,2}/\d{1,2}/\d{2,4}\s+at\s+\d{1,2}:\d{2}\s+[AP]M)""".toRegex()
-            
-            // Extract transaction ID
-            val transactionId = transactionIdRegex.find(smsText)?.groupValues?.get(1) ?: ""
-            Log.i(TAG, "Fallback: Extracted transaction ID: '$transactionId'")
-            
-            if (transactionId.isBlank()) {
-                Log.e(TAG, "Fallback: Could not extract transaction ID")
-                return false
-            }
-            
-            // Extract amount
-            val amountMatch = amountRegex.find(smsText)
-            val amountStr = amountMatch?.groupValues?.get(1)?.replace(",", "") ?: "0.0"
-            Log.i(TAG, "Fallback: Extracted amount: '$amountStr'")
-            
-            // Determine direction
-            val direction = when {
-                smsText.contains("You have received", ignoreCase = true) -> "received"
-                smsText.contains("You have sent", ignoreCase = true) -> "sent"
-                smsText.contains("paid to", ignoreCase = true) -> "sent"
-                else -> "unknown"
-            }
-            Log.i(TAG, "Fallback: Determined direction: '$direction'")
-            
-            // Extract counterparty (person/business name)
-            val counterparty = when {
-                direction == "received" -> {
-                    val fromRegex = """from\s+([A-Z\s]+?)(?:\s+\d{10}|\s+on)""".toRegex()
-                    fromRegex.find(smsText)?.groupValues?.get(1)?.trim() ?: "Unknown"
-                }
-                direction == "sent" -> {
-                    val toRegex = """(?:to|paid to)\s+([A-Z\s]+?)(?:\s+\d{10}|\s+on)""".toRegex()
-                    toRegex.find(smsText)?.groupValues?.get(1)?.trim() ?: "Unknown"
-                }
-                else -> "Unknown"
-            }
-            Log.i(TAG, "Fallback: Extracted counterparty: '$counterparty'")
-            
-            // Extract date/time
-            val dateTime = dateTimeRegex.find(smsText)?.groupValues?.get(1) ?: "Unknown Time"
-            Log.i(TAG, "Fallback: Extracted date/time: '$dateTime'")
-            
-            // Check if transaction already exists
-            val database = MpesaDatabase.getDatabase(applicationContext)
-            val transactionDao = database.transactionDao()
-            
-            if (transactionDao.exists(transactionId)) {
-                Log.w(TAG, "Fallback: Transaction $transactionId already exists, skipping")
-                return true // Consider this a success since transaction exists
-            }
-            
-            // Save transaction
-            val transaction = TransactionEntity(
-                transactionId = transactionId,
-                direction = direction,
-                amountKes = amountStr.toDoubleOrNull() ?: 0.0,
-                counterparty = counterparty,
-                dateTime = dateTime,
-                rawMessage = smsText
-            )
-            
-            transactionDao.insert(transaction)
-            Log.i(TAG, "✅ Fallback: Successfully saved transaction: $transactionId")
-            
-            // Update theater with structured data from fallback
-            val structuredDataFallback = mapOf(
-                "transaction_id" to transactionId,
-                "direction" to direction,
-                "amount_kes" to amountStr,
-                "counterparty" to counterparty,
-                "date_time" to dateTime
-            )
-            agentManager.updateSessionData(structuredDataFallback)
-            
-            // Record successful fallback function call for inspector
-            val functionInputs = mapOf(
-                "sms_message" to smsText,
-                "parsing_method" to "fallback_regex"
-            )
-            val functionOutputs = mapOf(
-                "transaction_id" to transactionId,
-                "direction" to direction,
-                "amount_kes" to amountStr,
-                "counterparty" to counterparty,
-                "date_time" to dateTime
-            )
-            
-            agentManager.recordFunctionCall(
-                agentType = AgentType.FINANCE_IQ,
-                functionName = "fallback_parse_mpesa_sms",
-                inputs = functionInputs,
-                outputs = functionOutputs,
-                success = true,
-                executionTimeMs = System.currentTimeMillis() - startTime,
-                confidence = 0.75f  // Lower confidence for fallback parsing
-            )
-            
-            // Update agents with successful fallback parsing
-            agentManager.updateFinanceIQState(
-                status = AgentStatus.COMPLETE,
-                message = "Fallback parsing successful!",
-                progress = 1.0f
-            )
-            
-            // Start SpendWise for categorization
-            agentManager.updateSpendWiseState(
-                status = AgentStatus.ACTIVE,
-                message = "Categorizing transaction...",
-                progress = 0.5f
-            )
-            agentManager.addChatMessage(AgentType.SPEND_WISE, "🧠 Analyzing transaction category from fallback data...")
-            
-            // Simple categorization for fallback
-            val category = when {
-                counterparty.contains("SUPERMARKET", ignoreCase = true) -> "groceries"
-                counterparty.contains("TRANSPORT", ignoreCase = true) -> "transport"
-                counterparty.contains("GILBERT", ignoreCase = true) -> "personal"
-                else -> "other"
-            }
-            
-            // Update transaction with category
-            val updatedTransaction = transaction.copy(category = category, confidence = "medium")
-            transactionDao.update(updatedTransaction)
-            
-            // 🎯 ENVELOPE ALLOCATION: Allocate fallback transaction to appropriate envelope
-            try {
-                val envelopeManager = EnvelopeManager.getInstance(applicationContext) 
-                val allocationResult = envelopeManager.allocateTransaction(
-                    transactionId = transactionId,
-                    category = category,
-                    amount = amountStr.toDoubleOrNull() ?: 0.0,
-                    direction = direction,
-                    counterparty = counterparty
-                )
-                
-                if (allocationResult.success) {
-                    Log.i(TAG, "💰 Fallback envelope allocation successful: ${allocationResult.message}")
-                    
-                    // 🎯 PHASE 3: SpendWise Envelope Intelligence (Fallback)
-                    val warningLevelStr = when (allocationResult.warningLevel) {
-                        com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> "critical"
-                        com.google.sample.fcdemo.envelope.WarningLevel.WARNING -> "warning"
-                        com.google.sample.fcdemo.envelope.WarningLevel.CAUTION -> "caution"
-                        com.google.sample.fcdemo.envelope.WarningLevel.ERROR -> "error"
-                        else -> "none"
-                    }
-                    
-                    // SpendWise: Smart budget coaching (fallback)
-                    agentManager.spendWiseBudgetCoaching(
-                        envelopeName = allocationResult.envelopeName,
-                        budgetUsage = allocationResult.budgetUsagePercentage ?: 0.0,
-                        warningLevel = warningLevelStr,
-                        amount = amountStr.toDoubleOrNull() ?: 0.0
-                    )
-                    
-                    // Legacy compatibility message
-                    agentManager.addChatMessage(
-                        AgentType.SPEND_WISE,
-                        "💰 Fallback allocation: ${allocationResult.envelopeName} (${((allocationResult.budgetUsagePercentage ?: 0.0) * 100).toInt()}% used)"
-                    )
-                } else {
-                    Log.w(TAG, "⚠️ Fallback envelope allocation failed: ${allocationResult.message}")
-                    agentManager.addChatMessage(
-                        AgentType.SPEND_WISE,
-                        "⚠️ Could not allocate to envelope: ${allocationResult.message}"
-                    )
-                }
-            } catch (envelopeError: Exception) {
-                Log.e(TAG, "❌ Fallback envelope allocation error: ${envelopeError.message}", envelopeError)
-            }
-            
-            agentManager.updateSpendWiseState(
-                status = AgentStatus.COMPLETE,
-                message = "Category: $category",
-                progress = 1.0f
-            )
-            agentManager.addChatMessage(AgentType.SPEND_WISE, "✨ Categorized as '$category' with medium confidence!")
-            agentManager.completeSession(success = true, transactionId = transactionId)
-            
-            return true
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Fallback parsing failed: ${e.message}", e)
-            return false
-        }
-    }
+    // 🚫 FALLBACK REMOVED: AI function calling must work reliably
+    // No more fallback methods - if AI function calling fails, we fix the AI system instead
 
     private suspend fun parseAndSaveTransaction(parts: List<Part?>, rawMessage: String, startTime: Long) {
         val database = MpesaDatabase.getDatabase(applicationContext)
@@ -668,27 +458,45 @@ class SmsProcessingWorker(
             .addParts(
                 Part.newBuilder()
                     .setText("""
-You are a specialized M-PESA transaction extraction AI. You MUST ALWAYS respond with a function call to 'parse_mpesa_sms'. NEVER respond with plain text.
+🔴 CRITICAL FUNCTION CALLING REQUIREMENT 🔴
+You are a specialized M-PESA transaction extraction AI. 
 
-CRITICAL: You must use the parse_mpesa_sms function with these exact parameters:
-- transaction_id: The M-PESA transaction code (e.g., "TGV7DCXEI7")
-- direction: Either "received" or "sent" 
-- amount_kes: The amount as a string (e.g., "20.00")
-- counterparty: The person/business name (e.g., "GILBERT MAKATIANI")
-- date_time: The date and time from the SMS (e.g., "31/7/25 at 11:32 PM")
+MANDATORY BEHAVIOR:
+- You MUST ALWAYS respond with ONLY a function call to 'parse_mpesa_sms'
+- You MUST NEVER respond with plain text, explanations, or any other content
+- Every response MUST be a valid function call with ALL required parameters
+- If you cannot extract a parameter, use reasonable defaults but STILL call the function
 
-EXAMPLE INPUT: "TGV7DCXEI7 Confirmed.You have received Ksh20.00 from GILBERT MAKATIANI 0725484223 on 31/7/25 at 11:32 PM New M-PESA balance is Ksh240.00."
+REQUIRED PARAMETERS (ALL MANDATORY):
+- transaction_id: M-PESA code (e.g., "TGV7DCXEI7") 
+- direction: EXACTLY "received" OR "sent" (never "unknown")
+- amount_kes: Amount as string without "Ksh" (e.g., "20.00")
+- counterparty: Person/business name (e.g., "GILBERT MAKATIANI")
+- date_time: Date/time from SMS (e.g., "31/7/25 at 11:32 PM")
 
-REQUIRED OUTPUT FORMAT: You must call parse_mpesa_sms function with:
-{
+PARSING RULES:
+- For "received": look for "You have received", "from [NAME]"
+- For "sent": look for "You have sent", "paid to [NAME]", "sent to [NAME]"
+- Remove commas from amounts: "1,500.00" → "1500.00"
+- Keep counterparty names uppercase: "GILBERT MAKATIANI"
+- Extract exact date/time format from SMS
+
+EXAMPLE PROCESSING:
+INPUT: "TGV7DCXEI7 Confirmed.You have received Ksh20.00 from GILBERT MAKATIANI 0725484223 on 31/7/25 at 11:32 PM New M-PESA balance is Ksh240.00."
+
+REQUIRED FUNCTION CALL:
+parse_mpesa_sms({
   "transaction_id": "TGV7DCXEI7",
   "direction": "received", 
   "amount_kes": "20.00",
   "counterparty": "GILBERT MAKATIANI",
   "date_time": "31/7/25 at 11:32 PM"
-}
+})
 
-ABSOLUTELY NO PLAIN TEXT RESPONSES. ONLY FUNCTION CALLS.
+🚫 FORBIDDEN: Plain text, explanations, "I cannot", error messages, anything except function calls
+✅ REQUIRED: Only valid parse_mpesa_sms function calls with all 5 parameters
+
+FAILURE TO FOLLOW = SYSTEM ERROR. ALWAYS USE FUNCTION CALLS.
                     """.trimIndent())
             )
             .build()
@@ -825,6 +633,20 @@ ABSOLUTELY NO PLAIN TEXT RESPONSES. ONLY FUNCTION CALLS.
                     
                     if (allocationResult.success) {
                         Log.i(TAG, "💰 Envelope allocation successful: ${allocationResult.message}")
+                        
+                        // 🔧 SUSPENSE BALANCE FIX: Trigger UI refresh after allocation
+                        // Post message to main thread to refresh suspense balance
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            try {
+                                // Trigger ViewModel refresh through WorkManager result data
+                                setProgressAsync(workDataOf(
+                                    PROGRESS_KEY to "✅ Allocation complete",
+                                    "suspense_refresh" to "true"
+                                ))
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to trigger suspense balance refresh: ${e.message}")
+                            }
+                        }
                         
                         // 🎯 PHASE 3: SpendWise Envelope Intelligence - Smart Budget Coaching
                         val warningLevelStr = when (allocationResult.warningLevel) {

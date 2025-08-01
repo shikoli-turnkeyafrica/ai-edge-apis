@@ -3,6 +3,7 @@ package com.google.sample.fcdemo.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -32,6 +33,7 @@ import com.google.sample.fcdemo.viewmodel.MpesaViewModel
 @Composable
 fun EnvelopeStatusCards(
     viewModel: MpesaViewModel,
+    onOpenBudgetSetup: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Safe envelope collection with error handling
@@ -61,14 +63,48 @@ fun EnvelopeStatusCards(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .glass()
             ) {
-                Text(
-                    text = "Total Budget Usage: $overallUsage% used",
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.padding(12.dp),
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Total Budget Usage: $overallUsage% used",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontWeight = FontWeight.Medium
+                    )
+                    
+                    // Budget Setup Button
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White.copy(alpha = 0.2f)
+                        ),
+                        modifier = Modifier
+                            .clickable { onOpenBudgetSetup() }
+                            .glass(),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "⚙️",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            Text(
+                                text = "Setup",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
             }
         }
         

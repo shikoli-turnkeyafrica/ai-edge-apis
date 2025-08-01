@@ -66,12 +66,22 @@ fun MpesaTrackerScreen(
     // Collapsible section states
     var isEnvelopesExpanded by remember { mutableStateOf(true) }
     var isTransactionsExpanded by remember { mutableStateOf(true) }
+    
+    // Budget setup navigation state
+    var showBudgetSetup by remember { mutableStateOf(false) }
 
     val pagedTransactions = viewModel.pagedTransactions.collectAsLazyPagingItems()
     val groupedTransactions by viewModel.groupedTransactions.collectAsStateWithLifecycle(initialValue = emptyMap())
     val isProcessing by viewModel.isProcessing.collectAsStateWithLifecycle()
     val workProgress by viewModel.workProgress.collectAsStateWithLifecycle()
 
+    // Conditional navigation between main screen and budget setup
+    if (showBudgetSetup) {
+        BudgetSetupScreen(
+            viewModel = viewModel,
+            onNavigateBack = { showBudgetSetup = false }
+        )
+    } else {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -121,6 +131,7 @@ fun MpesaTrackerScreen(
             ) {
                 EnvelopeStatusCards(
                     viewModel = viewModel,
+                    onOpenBudgetSetup = { showBudgetSetup = true },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -312,6 +323,7 @@ fun MpesaTrackerScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
     }
 }
 

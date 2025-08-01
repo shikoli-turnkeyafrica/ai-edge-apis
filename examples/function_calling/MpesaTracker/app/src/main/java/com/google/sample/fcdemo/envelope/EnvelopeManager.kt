@@ -32,9 +32,9 @@ class EnvelopeManager private constructor(context: Context) {
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     
     /**
-     * Allocate a transaction using the two-step Suspense Account flow
-     * STEP 1: All M-PESA money flows through Suspense Account first
-     * STEP 2: Money gets allocated from Suspense to the target envelope
+     * Allocate M-PESA transactions using the correct flow:
+     * 💰 RECEIVED → Suspense Account (income pool for future allocation)
+     * 💸 SENT → Target Envelope (direct spending allocation)
      */
     suspend fun allocateTransaction(
         transactionId: String,
@@ -45,98 +45,160 @@ class EnvelopeManager private constructor(context: Context) {
     ): EnvelopeAllocationResult {
         
         try {
-            Log.d(TAG, "⚖️ Starting two-step allocation: $transactionId, category: $category, amount: $amount, direction: $direction")
+            Log.d(TAG, "📱 M-PESA allocation: $transactionId, category: $category, amount: $amount, direction: $direction")
             
-            // STEP 1: Add all M-PESA transactions to Suspense Account first
-            val suspenseAccount = envelopeDao.getEnvelopeById("suspense")
-            if (suspenseAccount == null) {
-                Log.e(TAG, "❌ Suspense Account not found! This should never happen.")
-                return EnvelopeAllocationResult(
-                    success = false,
-                    message = "Suspense Account missing - system error",
-                    warningLevel = WarningLevel.ERROR
-                )
-            }
-            
-            // Calculate the raw M-PESA amount (positive for received, negative for sent)
-            val mpesaAmount = when (direction.lowercase()) {
-                "received" -> amount   // Money coming in
-                "sent" -> -amount     // Money going out
-                else -> -amount       // Default to outgoing
-            }
-            
-            // Add to Suspense Account
-            envelopeDao.updateEnvelopeBalance("suspense", mpesaAmount)
-            Log.i(TAG, "⚖️ Step 1: Added KSh${mpesaAmount} to Suspense Account")
-            
-            // STEP 2: Allocate from Suspense to target envelope (only for spending)
-            if (direction.lowercase() == "sent") {
-                // Find target envelope for spending allocation
-                val targetEnvelope = findEnvelopeForCategory(category)
-                
-                if (targetEnvelope != null && targetEnvelope.envelopeId != "suspense") {
-                    // Transfer from Suspense to target envelope
-                    envelopeDao.transferBetweenEnvelopes("suspense", targetEnvelope.envelopeId, amount)
-                    Log.i(TAG, "💸 Step 2: Allocated KSh${amount} from Suspense to ${targetEnvelope.displayName}")
-                    
-                    // Get updated target envelope for status
-                    val updatedTarget = envelopeDao.getEnvelopeById(targetEnvelope.envelopeId)
-                    if (updatedTarget != null) {
-                        val warningLevel = when {
-                            updatedTarget.isOverBudget -> WarningLevel.CRITICAL
-                            updatedTarget.isApproachingLimit -> WarningLevel.WARNING  
-                            updatedTarget.budgetUsagePercentage > 0.75 -> WarningLevel.CAUTION
-                            else -> WarningLevel.NONE
-                        }
-                        
-                        val message = generateSuspenseAllocationMessage(updatedTarget, amount, counterparty)
-                        
-                        return EnvelopeAllocationResult(
-                            success = true,
-                            envelopeId = targetEnvelope.envelopeId,
-                            envelopeName = targetEnvelope.displayName,
-                            previousBalance = targetEnvelope.currentBalanceKes,
-                            newBalance = updatedTarget.currentBalanceKes,
-                            budgetUsagePercentage = updatedTarget.budgetUsagePercentage,
-                            message = message,
-                            warningLevel = warningLevel
-                        )
-                    }
-                } else {
-                    Log.w(TAG, "⚠️ No target envelope found for category: $category - money stays in Suspense")
-                    return EnvelopeAllocationResult(
-                        success = true,
-                        envelopeId = "suspense",
-                        envelopeName = "Suspense Account",
-                        message = "⚖️ Transaction added to Suspense Account (category: $category)",
-                        warningLevel = WarningLevel.INFO
-                    )
+            return when (direction.lowercase()) {
+                "received" -> {
+                    // 💰 RECEIVED money goes to Suspense Account (income pool)
+                    handleReceivedMoney(amount, counterparty)
                 }
-            } else {
-                // For received money, just stay in Suspense Account
-                Log.i(TAG, "💰 Income KSh${amount} added to Suspense Account")
-                return EnvelopeAllocationResult(
-                    success = true,
-                    envelopeId = "suspense",
-                    envelopeName = "Suspense Account",
-                    message = "💰 Income KSh${amount} added to Suspense Account",
-                    warningLevel = WarningLevel.NONE
-                )
+                "sent" -> {
+                    // 💸 SENT money goes directly to target envelope
+                    handleSpentMoney(category, amount, counterparty)
+                }
+                else -> {
+                    Log.w(TAG, "⚠️ Unknown direction: $direction, defaulting to spending")
+                    handleSpentMoney(category, amount, counterparty)
+                }
             }
-            
-            return EnvelopeAllocationResult(
-                success = false,
-                message = "Allocation process incomplete"
-            )
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error in suspense allocation: ${e.message}", e)
+            Log.e(TAG, "❌ Error in M-PESA allocation: ${e.message}", e)
             return EnvelopeAllocationResult(
                 success = false,
-                message = "Suspense allocation failed: ${e.message}",
+                message = "M-PESA allocation failed: ${e.message}",
                 warningLevel = WarningLevel.ERROR
             )
         }
+    }
+    
+    /**
+     * Handle received money: Add to Suspense Account
+     */
+    private suspend fun handleReceivedMoney(
+        amount: Double,
+        counterparty: String
+    ): EnvelopeAllocationResult {
+        val suspenseAccount = envelopeDao.getEnvelopeById("suspense")
+        if (suspenseAccount == null) {
+            Log.e(TAG, "❌ Suspense Account not found!")
+            return EnvelopeAllocationResult(
+                success = false,
+                message = "Suspense Account missing - system error",
+                warningLevel = WarningLevel.ERROR
+            )
+        }
+        
+        // Add income to Suspense Account
+        envelopeDao.updateEnvelopeBalance("suspense", amount)
+        Log.i(TAG, "💰 Income KSh${amount} added to Suspense Account")
+        
+        return EnvelopeAllocationResult(
+            success = true,
+            envelopeId = "suspense",
+            envelopeName = "Suspense Account",
+            message = "💰 Income KSh${amount} received from $counterparty → Suspense Account",
+            warningLevel = WarningLevel.NONE
+        )
+    }
+    
+    /**
+     * Handle spent money: Direct allocation to target envelope (or Miscellaneous if no envelope)
+     */
+    private suspend fun handleSpentMoney(
+        category: String,
+        amount: Double,
+        counterparty: String
+    ): EnvelopeAllocationResult {
+        // Find target envelope for this category
+        val targetEnvelope = findEnvelopeForCategory(category)
+        
+        if (targetEnvelope != null && targetEnvelope.envelopeId != "suspense") {
+            // Direct allocation to target envelope
+            envelopeDao.updateEnvelopeBalance(targetEnvelope.envelopeId, -amount)
+            Log.i(TAG, "💸 Spending KSh${amount} allocated to ${targetEnvelope.displayName}")
+            
+            // Get updated envelope for status
+            val updatedEnvelope = envelopeDao.getEnvelopeById(targetEnvelope.envelopeId)
+            if (updatedEnvelope != null) {
+                val warningLevel = when {
+                    updatedEnvelope.isOverBudget -> WarningLevel.CRITICAL
+                    updatedEnvelope.isApproachingLimit -> WarningLevel.WARNING  
+                    updatedEnvelope.budgetUsagePercentage > 0.75 -> WarningLevel.CAUTION
+                    else -> WarningLevel.NONE
+                }
+                
+                val message = generateSpendingMessage(updatedEnvelope, amount, counterparty)
+                
+                return EnvelopeAllocationResult(
+                    success = true,
+                    envelopeId = targetEnvelope.envelopeId,
+                    envelopeName = targetEnvelope.displayName,
+                    previousBalance = targetEnvelope.currentBalanceKes,
+                    newBalance = updatedEnvelope.currentBalanceKes,
+                    budgetUsagePercentage = updatedEnvelope.budgetUsagePercentage,
+                    message = message,
+                    warningLevel = warningLevel
+                )
+            }
+        } else {
+            // No envelope found - allocate to Miscellaneous envelope (create if needed)
+            return handleMiscellaneousSpending(category, amount, counterparty)
+        }
+        
+        return EnvelopeAllocationResult(
+            success = false,
+            message = "Spending allocation failed"
+        )
+    }
+    
+    /**
+     * Handle spending that doesn't match any envelope - goes to Miscellaneous
+     */
+    private suspend fun handleMiscellaneousSpending(
+        category: String,
+        amount: Double,
+        counterparty: String
+    ): EnvelopeAllocationResult {
+        // Find or create Miscellaneous envelope
+        var miscEnvelope = envelopeDao.getEnvelopeById("miscellaneous")
+        
+        if (miscEnvelope == null) {
+            // Create Miscellaneous envelope if it doesn't exist
+            val currentTime = System.currentTimeMillis()
+            miscEnvelope = EnvelopeEntity(
+                envelopeId = "miscellaneous",
+                displayName = "Miscellaneous",
+                description = "Uncategorized spending - needs manual allocation",
+                budgetAmountKes = 5000.0,  // Default budget
+                icon = "📦",
+                color = "#9E9E9E",  // Gray color
+                sortOrder = 99  // Last in list
+            )
+            envelopeDao.insertEnvelope(miscEnvelope)
+            Log.i(TAG, "📦 Created Miscellaneous envelope")
+        }
+        
+        // Allocate to Miscellaneous envelope
+        envelopeDao.updateEnvelopeBalance("miscellaneous", -amount)
+        Log.w(TAG, "📦 Uncategorized spending KSh${amount} → Miscellaneous (category: $category)")
+        
+        val updatedMisc = envelopeDao.getEnvelopeById("miscellaneous")
+        if (updatedMisc != null) {
+            return EnvelopeAllocationResult(
+                success = true,
+                envelopeId = "miscellaneous",
+                envelopeName = "Miscellaneous",
+                newBalance = updatedMisc.currentBalanceKes,
+                message = "📦 Uncategorized: KSh${amount} → Miscellaneous (category: $category)",
+                warningLevel = WarningLevel.INFO
+            )
+        }
+        
+        return EnvelopeAllocationResult(
+            success = false,
+            message = "Failed to allocate to Miscellaneous envelope"
+        )
     }
     
     /**
@@ -163,7 +225,25 @@ class EnvelopeManager private constructor(context: Context) {
     }
     
     /**
-     * Generate user-friendly allocation message for suspense account flow
+     * Generate user-friendly spending message for direct envelope allocation
+     */
+    private fun generateSpendingMessage(
+        envelope: EnvelopeEntity, 
+        amount: Double,
+        counterparty: String
+    ): String {
+        val usagePercent = (envelope.budgetUsagePercentage * 100).toInt()
+        
+        return when {
+            envelope.isOverBudget -> "⚠️ Over budget! ${envelope.displayName}: KSh$amount spent to $counterparty. Budget exceeded by KSh${envelope.spentAmountKes - envelope.budgetAmountKes}"
+            envelope.isApproachingLimit -> "🟡 Approaching limit: ${envelope.displayName}: KSh$amount spent to $counterparty ($usagePercent% used)"
+            usagePercent > 75 -> "🟠 High usage: ${envelope.displayName}: KSh$amount spent to $counterparty ($usagePercent% used)"
+            else -> "✅ ${envelope.displayName}: KSh$amount spent to $counterparty ($usagePercent% used)"
+        }
+    }
+    
+    /**
+     * Generate user-friendly allocation message for suspense account flow (legacy)
      */
     private fun generateSuspenseAllocationMessage(
         envelope: EnvelopeEntity, 

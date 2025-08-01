@@ -6,9 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -125,21 +122,32 @@ fun EnvelopeStatusCards(
                 }
             }
         } else {
-            // Staggered Grid of Envelope Cards
-            LazyVerticalStaggeredGrid(
-                columns = StaggeredGridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(16.dp),
-                modifier = Modifier.fillMaxWidth()
+            // Fixed grid layout (no nested scrolling)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(
-                    items = envelopes.sortedBy { it.sortOrder },
-                    key = { it.envelopeId }
-                ) { envelope ->
-                    EnvelopeCard(
-                        envelope = envelope,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                val sortedEnvelopes = envelopes.sortedBy { it.sortOrder }
+                val pairs = sortedEnvelopes.chunked(2)
+                
+                pairs.forEach { rowEnvelopes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowEnvelopes.forEach { envelope ->
+                            EnvelopeCard(
+                                envelope = envelope,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        // Fill remaining space if odd number of cards
+                        if (rowEnvelopes.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         }

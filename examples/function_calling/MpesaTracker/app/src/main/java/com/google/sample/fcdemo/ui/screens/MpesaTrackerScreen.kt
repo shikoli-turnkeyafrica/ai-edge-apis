@@ -1,6 +1,9 @@
 package com.google.sample.fcdemo.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +62,10 @@ fun MpesaTrackerScreen(
     var showAmounts by remember { mutableStateOf(true) }
     // View mode toggle (paged vs grouped)
     var useGroupedView by remember { mutableStateOf(false) }
+    
+    // Collapsible section states
+    var isEnvelopesExpanded by remember { mutableStateOf(true) }
+    var isTransactionsExpanded by remember { mutableStateOf(true) }
 
     val pagedTransactions = viewModel.pagedTransactions.collectAsLazyPagingItems()
     val groupedTransactions by viewModel.groupedTransactions.collectAsStateWithLifecycle(initialValue = emptyMap())
@@ -91,12 +99,31 @@ fun MpesaTrackerScreen(
             )
         }
         
-        // 💳 Phase 4: Budget Envelopes Dashboard
+        // 💳 Phase 4: Budget Envelopes Dashboard - Collapsible Header
         item {
-            EnvelopeStatusCards(
-                viewModel = viewModel,
-                modifier = Modifier.fillMaxWidth()
+            CollapsibleSectionHeader(
+                title = "📊 Budget Envelopes",
+                isExpanded = isEnvelopesExpanded,
+                onToggle = { isEnvelopesExpanded = !isEnvelopesExpanded }
             )
+        }
+        
+        // 💳 Collapsible Envelope Content
+        item {
+            AnimatedVisibility(
+                visible = isEnvelopesExpanded,
+                enter = expandVertically(
+                    animationSpec = tween(300, easing = EaseInOutCubic)
+                ) + fadeIn(animationSpec = tween(300)),
+                exit = shrinkVertically(
+                    animationSpec = tween(300, easing = EaseInOutCubic)
+                ) + fadeOut(animationSpec = tween(300))
+            ) {
+                EnvelopeStatusCards(
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
         
         // 🔄 Agent Processing Pipeline
@@ -178,74 +205,96 @@ fun MpesaTrackerScreen(
             }
         }
         
-        // 📊 Transactions Section Header
+        // 📊 Recent Transactions - Collapsible Header
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .glass(),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                elevation = CardDefaults.cardElevation(0.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.recent_transactions),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp)
-                )
+            CollapsibleSectionHeader(
+                title = stringResource(R.string.recent_transactions),
+                isExpanded = isTransactionsExpanded,
+                onToggle = { isTransactionsExpanded = !isTransactionsExpanded }
+            )
+        }
+        
+        // 📱 Collapsible Transactions List
+        if (isTransactionsExpanded) {
+            if (useGroupedView) {
+                // Grouped view - add by month
+                groupedTransactions.forEach { (month, transactions) ->
+                    item {
+                        AnimatedVisibility(
+                            visible = isTransactionsExpanded,
+                            enter = expandVertically(
+                                animationSpec = tween(300, easing = EaseInOutCubic)
+                            ) + fadeIn(animationSpec = tween(300)),
+                            exit = shrinkVertically(
+                                animationSpec = tween(300, easing = EaseInOutCubic)
+                            ) + fadeOut(animationSpec = tween(300))
+                        ) {
+                            MonthHeader(month = month, transactionCount = transactions.size)
+                        }
+                    }
+                    items(transactions) { transaction ->
+                        AnimatedVisibility(
+                            visible = isTransactionsExpanded,
+                            enter = expandVertically(
+                                animationSpec = tween(300, easing = EaseInOutCubic)
+                            ) + fadeIn(animationSpec = tween(300)),
+                            exit = shrinkVertically(
+                                animationSpec = tween(300, easing = EaseInOutCubic)
+                            ) + fadeOut(animationSpec = tween(300))
+                        ) {
+                            TransactionItem(
+                                transaction = transaction,
+                                showName = showNames,
+                                showAmount = showAmounts
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Paged view - add individual transactions
+                items(pagedTransactions.itemCount) { index ->
+                    pagedTransactions[index]?.let { transaction ->
+                        AnimatedVisibility(
+                            visible = isTransactionsExpanded,
+                            enter = expandVertically(
+                                animationSpec = tween(300, easing = EaseInOutCubic)
+                            ) + fadeIn(animationSpec = tween(300)),
+                            exit = shrinkVertically(
+                                animationSpec = tween(300, easing = EaseInOutCubic)
+                            ) + fadeOut(animationSpec = tween(300))
+                        ) {
+                            TransactionItem(
+                                transaction = transaction,
+                                showName = showNames,
+                                showAmount = showAmounts
+                            )
+                        }
+                    }
+                }
             }
         }
         
-        // 📱 Transactions List - add individual transactions as items
-        if (useGroupedView) {
-            // Grouped view - add by month
-            groupedTransactions.forEach { (month, transactions) ->
-                item {
-                    MonthHeader(month = month, transactionCount = transactions.size)
-                }
-                items(transactions) { transaction ->
-                    TransactionItem(
-                        transaction = transaction,
-                        showName = showNames,
-                        showAmount = showAmounts
-                    )
+        // Loading states for paged
+        when (pagedTransactions.loadState.append) {
+            is androidx.paging.LoadState.Loading -> {
+                item { 
+                    Text(
+                        "Loading more…", 
+                        color = Color.Gray, 
+                        modifier = Modifier.padding(8.dp)
+                    ) 
                 }
             }
-        } else {
-            // Paged view - add individual transactions
-            items(pagedTransactions.itemCount) { index ->
-                pagedTransactions[index]?.let { transaction ->
-                    TransactionItem(
-                        transaction = transaction,
-                        showName = showNames,
-                        showAmount = showAmounts
-                    )
+            is androidx.paging.LoadState.Error -> {
+                item { 
+                    Text(
+                        "Error loading", 
+                        color = Color.Red, 
+                        modifier = Modifier.padding(8.dp)
+                    ) 
                 }
             }
-            
-            // Loading states for paged
-            when (pagedTransactions.loadState.append) {
-                is androidx.paging.LoadState.Loading -> {
-                    item { 
-                        Text(
-                            "Loading more…", 
-                            color = Color.Gray, 
-                            modifier = Modifier.padding(8.dp)
-                        ) 
-                    }
-                }
-                is androidx.paging.LoadState.Error -> {
-                    item { 
-                        Text(
-                            "Error loading", 
-                            color = Color.Red, 
-                            modifier = Modifier.padding(8.dp)
-                        ) 
-                    }
-                }
-                else -> {}
-            }
+            else -> {}
         }
         
         // Empty state if no transactions
@@ -680,6 +729,59 @@ private fun MonthHeader(month: String, transactionCount: Int) {
         }
     }
     Spacer(modifier = Modifier.height(8.dp))
+}
+
+/**
+ * Collapsible section header with expand/collapse animation
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollapsibleSectionHeader(
+    title: String,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .glass()
+            .clickable { onToggle() },
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.weight(1f)
+            )
+            
+            // Animated expand/collapse icon
+            val rotationAngle by animateFloatAsState(
+                targetValue = if (isExpanded) 180f else 0f,
+                animationSpec = tween(300, easing = EaseInOutCubic),
+                label = "CollapseIconRotation"
+            )
+            
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer { rotationZ = rotationAngle }
+            )
+        }
+    }
 }
 
  

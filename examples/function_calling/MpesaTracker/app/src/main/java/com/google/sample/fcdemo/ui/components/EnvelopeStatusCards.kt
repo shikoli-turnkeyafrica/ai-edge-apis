@@ -40,47 +40,35 @@ fun EnvelopeStatusCards(
     Column(
         modifier = modifier.fillMaxWidth()
     ) {
-        // Section Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "💳 Budget Envelopes",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+        // Total Budget Summary - with null safety
+        if (envelopes.isNotEmpty()) {
+            val totalBudget = envelopes.sumOf { envelope -> 
+                envelope.budgetAmountKes.takeIf { !it.isNaN() && it.isFinite() } ?: 0.0 
+            }
+            val totalSpent = envelopes.sumOf { envelope -> 
+                envelope.spentAmountKes.takeIf { !it.isNaN() && it.isFinite() } ?: 0.0 
+            }
+            val overallUsage = if (totalBudget > 0) {
+                ((totalSpent / totalBudget) * 100).toInt().coerceIn(0, 999)
+            } else 0
             
-            // Total Budget Summary - with null safety
-            if (envelopes.isNotEmpty()) {
-                val totalBudget = envelopes.sumOf { envelope -> 
-                    envelope.budgetAmountKes.takeIf { !it.isNaN() && it.isFinite() } ?: 0.0 
-                }
-                val totalSpent = envelopes.sumOf { envelope -> 
-                    envelope.spentAmountKes.takeIf { !it.isNaN() && it.isFinite() } ?: 0.0 
-                }
-                val overallUsage = if (totalBudget > 0) {
-                    ((totalSpent / totalBudget) * 100).toInt().coerceIn(0, 999)
-                } else 0
-                
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.1f)
-                    ),
-                    modifier = Modifier.glass()
-                ) {
-                    Text(
-                        text = "$overallUsage% used",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.1f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .glass()
+            ) {
+                Text(
+                    text = "Total Budget Usage: $overallUsage% used",
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(12.dp),
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
             }
         }
         

@@ -462,22 +462,29 @@ class SmsProcessingWorker(
                 
                 if (allocationResult.success) {
                     Log.i(TAG, "💰 Fallback envelope allocation successful: ${allocationResult.message}")
-                    agentManager.addChatMessage(
-                        AgentType.SPEND_WISE,
-                        "💰 Allocated to ${allocationResult.envelopeName}: ${allocationResult.message}"
+                    
+                    // 🎯 PHASE 3: SpendWise Envelope Intelligence (Fallback)
+                    val warningLevelStr = when (allocationResult.warningLevel) {
+                        com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> "critical"
+                        com.google.sample.fcdemo.envelope.WarningLevel.WARNING -> "warning"
+                        com.google.sample.fcdemo.envelope.WarningLevel.CAUTION -> "caution"
+                        com.google.sample.fcdemo.envelope.WarningLevel.ERROR -> "error"
+                        else -> "none"
+                    }
+                    
+                    // SpendWise: Smart budget coaching (fallback)
+                    agentManager.spendWiseBudgetCoaching(
+                        envelopeName = allocationResult.envelopeName,
+                        budgetUsage = allocationResult.budgetUsagePercentage ?: 0.0,
+                        warningLevel = warningLevelStr,
+                        amount = amountStr.toDoubleOrNull() ?: 0.0
                     )
                     
-                    // Check for warnings
-                    when (allocationResult.warningLevel) {
-                        com.google.sample.fcdemo.envelope.WarningLevel.WARNING,
-                        com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> {
-                            agentManager.addChatMessage(
-                                AgentType.SPEND_WISE,
-                                "⚠️ Budget Alert: ${allocationResult.message}"
-                            )
-                        }
-                        else -> {}
-                    }
+                    // Legacy compatibility message
+                    agentManager.addChatMessage(
+                        AgentType.SPEND_WISE,
+                        "💰 Fallback allocation: ${allocationResult.envelopeName} (${((allocationResult.budgetUsagePercentage ?: 0.0) * 100).toInt()}% used)"
+                    )
                 } else {
                     Log.w(TAG, "⚠️ Fallback envelope allocation failed: ${allocationResult.message}")
                     agentManager.addChatMessage(
@@ -558,6 +565,34 @@ class SmsProcessingWorker(
                         success = true,
                         executionTimeMs = System.currentTimeMillis() - startTime,
                         confidence = 0.95f  // High confidence for successful extraction
+                    )
+                    
+                    // 🎯 PHASE 3: FinanceIQ Envelope Intelligence
+                    val amount = amountStr.toDoubleOrNull() ?: 0.0
+                    
+                    // Get Suspense Account balance for context
+                    val envelopeManager = com.google.sample.fcdemo.envelope.EnvelopeManager.getInstance(applicationContext)
+                    val suspenseBalance = try {
+                        envelopeManager.getSuspenseAccountBalance()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not get suspense balance: ${e.message}")
+                        0.0
+                    }
+                    
+                    // FinanceIQ: Smart transaction analysis with envelope context
+                    agentManager.financeIQAnalyzeTransaction(
+                        transactionId = transactionId,
+                        amount = amount,
+                        direction = direction,
+                        counterparty = counterparty,
+                        suspenseBalance = suspenseBalance
+                    )
+                    
+                    // FinanceIQ: Suggest envelope allocation
+                    agentManager.financeIQSuggestAllocation(
+                        direction = direction,
+                        amount = amount,
+                        counterparty = counterparty
                     )
             
             if (transactionId.isBlank()) {
@@ -791,26 +826,35 @@ ABSOLUTELY NO PLAIN TEXT RESPONSES. ONLY FUNCTION CALLS.
                     if (allocationResult.success) {
                         Log.i(TAG, "💰 Envelope allocation successful: ${allocationResult.message}")
                         
-                        // Update agent manager with envelope information
-                        agentManager.addChatMessage(
-                            AgentType.SPEND_WISE, 
-                            "💰 Allocated to ${allocationResult.envelopeName}: ${allocationResult.message}"
+                        // 🎯 PHASE 3: SpendWise Envelope Intelligence - Smart Budget Coaching
+                        val warningLevelStr = when (allocationResult.warningLevel) {
+                            com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> "critical"
+                            com.google.sample.fcdemo.envelope.WarningLevel.WARNING -> "warning"
+                            com.google.sample.fcdemo.envelope.WarningLevel.CAUTION -> "caution"
+                            com.google.sample.fcdemo.envelope.WarningLevel.ERROR -> "error"
+                            else -> "none"
+                        }
+                        
+                        // SpendWise: Smart budget coaching
+                        agentManager.spendWiseBudgetCoaching(
+                            envelopeName = allocationResult.envelopeName,
+                            budgetUsage = allocationResult.budgetUsagePercentage ?: 0.0,
+                            warningLevel = warningLevelStr,
+                            amount = existingTransaction.amountKes
                         )
                         
-                        // Check for warnings and notify agents
-                        when (allocationResult.warningLevel) {
-                            com.google.sample.fcdemo.envelope.WarningLevel.WARNING,
-                            com.google.sample.fcdemo.envelope.WarningLevel.CRITICAL -> {
-                                agentManager.addChatMessage(
-                                    AgentType.SPEND_WISE,
-                                    "⚠️ Budget Alert: ${allocationResult.message}"
-                                )
-                                Log.w(TAG, "⚠️ Envelope warning: ${allocationResult.message}")
-                            }
-                            else -> {
-                                Log.d(TAG, "✅ Envelope allocation completed normally")
-                            }
-                        }
+                        // SpendWise: Smart envelope recommendation
+                        agentManager.spendWiseRecommendEnvelope(
+                            category = category,
+                            amount = existingTransaction.amountKes,
+                            availableEnvelopes = listOf("groceries", "transport", "bills", "entertainment", "health", "savings")
+                        )
+                        
+                        // Legacy chat message (keeping for compatibility)
+                        agentManager.addChatMessage(
+                            AgentType.SPEND_WISE, 
+                            "💰 Smart allocation complete: ${allocationResult.envelopeName} (${((allocationResult.budgetUsagePercentage ?: 0.0) * 100).toInt()}% budget used)"
+                        )
                         
                     } else {
                         Log.w(TAG, "⚠️ Envelope allocation failed: ${allocationResult.message}")

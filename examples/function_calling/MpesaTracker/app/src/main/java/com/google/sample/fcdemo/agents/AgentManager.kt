@@ -281,4 +281,146 @@ class AgentManager private constructor() {
             AgentType.SPEND_WISE -> "Financial Categorization Expert"
         }
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 🎯 PHASE 3: ENVELOPE INTELLIGENCE - Smart Agent Coaching
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * FinanceIQ: Suggest envelope allocation for received money
+     */
+    fun financeIQSuggestAllocation(direction: String, amount: Double, counterparty: String = "") {
+        when (direction.lowercase()) {
+            "received" -> {
+                updateFinanceIQState(
+                    status = AgentStatus.THINKING,
+                    message = "Smart routing: Income → Suspense Account",
+                    progress = 0.8f
+                )
+                
+                addChatMessage(
+                    AgentType.FINANCE_IQ,
+                    "💰 Income detected: KSh${amount} from $counterparty → routing to Suspense Account for allocation"
+                )
+            }
+            "sent" -> {
+                updateFinanceIQState(
+                    status = AgentStatus.THINKING,
+                    message = "Smart routing: Spending → Category Envelope",
+                    progress = 0.8f
+                )
+                
+                addChatMessage(
+                    AgentType.FINANCE_IQ,
+                    "💸 Spending detected: KSh${amount} to $counterparty → routing to category envelope"
+                )
+            }
+        }
+    }
+    
+    /**
+     * SpendWise: Provide budget coaching based on envelope status
+     */
+    fun spendWiseBudgetCoaching(
+        envelopeName: String?,
+        budgetUsage: Double,
+        warningLevel: String,
+        amount: Double
+    ) {
+        when (warningLevel.lowercase()) {
+            "critical" -> {
+                updateSpendWiseState(
+                    status = AgentStatus.ERROR,
+                    message = "⚠️ BUDGET ALERT: $envelopeName over limit!",
+                    progress = 1.0f
+                )
+                
+                addChatMessage(
+                    AgentType.SPEND_WISE,
+                    "🚨 BUDGET EXCEEDED: $envelopeName is over budget! Consider reallocating from other envelopes."
+                )
+            }
+            "warning" -> {
+                updateSpendWiseState(
+                    status = AgentStatus.THINKING,
+                    message = "🟡 Budget approaching limit: $envelopeName",
+                    progress = 1.0f
+                )
+                
+                addChatMessage(
+                    AgentType.SPEND_WISE,
+                    "⚠️ BUDGET WARNING: $envelopeName is ${(budgetUsage * 100).toInt()}% used. Consider slowing spending in this category."
+                )
+            }
+            "caution" -> {
+                addChatMessage(
+                    AgentType.SPEND_WISE,
+                    "🟠 Budget Update: $envelopeName now ${(budgetUsage * 100).toInt()}% used. KSh${amount} allocated."
+                )
+            }
+            else -> {
+                addChatMessage(
+                    AgentType.SPEND_WISE,
+                    "✅ Budget tracking: KSh${amount} allocated to $envelopeName (${(budgetUsage * 100).toInt()}% used)"
+                )
+            }
+        }
+    }
+    
+    /**
+     * FinanceIQ: Smart transaction analysis with envelope context
+     */
+    fun financeIQAnalyzeTransaction(
+        transactionId: String,
+        amount: Double,
+        direction: String,
+        counterparty: String,
+        suspenseBalance: Double
+    ) {
+        updateFinanceIQState(
+            status = AgentStatus.ACTIVE,
+            message = "Analyzing transaction with envelope context...",
+            progress = 0.5f
+        )
+        
+        val balanceContext = if (suspenseBalance > 0) {
+            "Suspense has KSh${String.format("%.2f", suspenseBalance)} available"
+        } else {
+            "Suspense Account needs funding"
+        }
+        
+        addChatMessage(
+            AgentType.FINANCE_IQ,
+            "🔍 Transaction Analysis: $transactionId - KSh$amount $direction. $balanceContext."
+        )
+    }
+    
+    /**
+     * SpendWise: Smart envelope recommendation
+     */
+    fun spendWiseRecommendEnvelope(
+        category: String,
+        amount: Double,
+        availableEnvelopes: List<String>
+    ) {
+        updateSpendWiseState(
+            status = AgentStatus.THINKING,
+            message = "Analyzing best envelope for $category spending...",
+            progress = 0.7f
+        )
+        
+        val recommendation = when (category.lowercase()) {
+            "groceries" -> "🛒 Groceries envelope - essential spending"
+            "transport" -> "🚌 Transport envelope - mobility needs"
+            "entertainment" -> "🎬 Entertainment envelope - discretionary spending"
+            "bills" -> "📱 Bills envelope - fixed obligations"
+            "health" -> "🏥 Health envelope - medical needs"
+            else -> "📦 Miscellaneous envelope - uncategorized spending"
+        }
+        
+        addChatMessage(
+            AgentType.SPEND_WISE,
+            "🎯 Smart allocation: KSh$amount → $recommendation"
+        )
+    }
 }

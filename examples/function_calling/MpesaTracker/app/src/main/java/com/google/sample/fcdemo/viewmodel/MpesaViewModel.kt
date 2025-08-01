@@ -90,6 +90,14 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
     // Suspense Account Balance 
     private val _suspenseBalance = MutableStateFlow(0.0)
     val suspenseBalance: StateFlow<Double> = _suspenseBalance.asStateFlow()
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 📊 PHASE 4: ENVELOPE DASHBOARD - Data Streams
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    // All Envelopes Flow
+    val allEnvelopes: Flow<List<com.google.sample.fcdemo.data.EnvelopeEntity>> = 
+        MpesaDatabase.getDatabase(application).envelopeDao().getAllEnvelopes()
 
     init {
         transactionDao = MpesaDatabase.getDatabase(application).transactionDao()

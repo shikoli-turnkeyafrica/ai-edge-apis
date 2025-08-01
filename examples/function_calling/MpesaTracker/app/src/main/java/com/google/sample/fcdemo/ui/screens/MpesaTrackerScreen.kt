@@ -33,6 +33,7 @@ import com.google.sample.fcdemo.ui.components.AgentPipeline
 import com.google.sample.fcdemo.ui.components.AgentChatSystem
 import com.google.sample.fcdemo.ui.components.FunctionCallInspector
 import com.google.sample.fcdemo.ui.components.ProcessingTheater
+import com.google.sample.fcdemo.ui.components.EnvelopeStatusCards
 import com.google.sample.fcdemo.ui.theme.glass
 import java.text.NumberFormat
 import java.util.*
@@ -85,6 +86,14 @@ fun MpesaTrackerScreen(
         // 🤖 EdgeFinance AI Agents Status Cards
         item {
             AgentStatusCards(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        
+        // 💳 Phase 4: Budget Envelopes Dashboard
+        item {
+            EnvelopeStatusCards(
                 viewModel = viewModel,
                 modifier = Modifier.fillMaxWidth()
             )

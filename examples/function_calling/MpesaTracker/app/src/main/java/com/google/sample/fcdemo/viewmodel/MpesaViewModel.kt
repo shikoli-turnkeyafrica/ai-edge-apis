@@ -95,9 +95,14 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
     // 📊 PHASE 4: ENVELOPE DASHBOARD - Data Streams
     // ═══════════════════════════════════════════════════════════════════════════════
     
-    // All Envelopes Flow
+    // All Envelopes Flow - with error handling
     val allEnvelopes: Flow<List<com.google.sample.fcdemo.data.EnvelopeEntity>> = 
-        MpesaDatabase.getDatabase(application).envelopeDao().getAllEnvelopes()
+        try {
+            MpesaDatabase.getDatabase(application).envelopeDao().getAllEnvelopes()
+        } catch (e: Exception) {
+            Log.e("MpesaViewModel", "Error accessing envelopes: ${e.message}", e)
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        }
 
     init {
         transactionDao = MpesaDatabase.getDatabase(application).transactionDao()
@@ -129,6 +134,9 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
         
         // Load initial suspense account balance
         refreshSuspenseBalance()
+        
+        // Initialize envelopes if needed
+        initializeEnvelopesIfNeeded()
     }
     
     private fun monitorWorkManager() {
@@ -300,5 +308,33 @@ class MpesaViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun updateSuspenseBalance() {
         refreshSuspenseBalance()
+    }
+    
+    /**
+     * Initialize envelopes if database is empty (crash prevention)
+     */
+    private fun initializeEnvelopesIfNeeded() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val database = MpesaDatabase.getDatabase(getApplication())
+                val envelopeDao = database.envelopeDao()
+                
+                // Check if envelopes exist
+                val existingCount = envelopeDao.getActiveEnvelopeCount()
+                if (existingCount == 0) {
+                    Log.i("MpesaViewModel", "No envelopes found, initializing default envelopes...")
+                    
+                    // Insert default envelopes
+                    val defaultEnvelopes = com.google.sample.fcdemo.data.DefaultEnvelopes.getDefaultEnvelopes()
+                    envelopeDao.insertEnvelopes(defaultEnvelopes)
+                    
+                    Log.i("MpesaViewModel", "✅ Initialized ${defaultEnvelopes.size} default envelopes")
+                } else {
+                    Log.d("MpesaViewModel", "Found $existingCount existing envelopes")
+                }
+            } catch (e: Exception) {
+                Log.e("MpesaViewModel", "Error initializing envelopes: ${e.message}", e)
+            }
+        }
     }
 } 

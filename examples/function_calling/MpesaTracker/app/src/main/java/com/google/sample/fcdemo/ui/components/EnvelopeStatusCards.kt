@@ -37,6 +37,7 @@ fun EnvelopeStatusCards(
     viewModel: MpesaViewModel,
     modifier: Modifier = Modifier
 ) {
+    // Safe envelope collection with error handling
     val envelopes by viewModel.allEnvelopes.collectAsStateWithLifecycle(initialValue = emptyList())
     
     Column(
@@ -57,11 +58,17 @@ fun EnvelopeStatusCards(
                 color = Color.White
             )
             
-            // Total Budget Summary
+            // Total Budget Summary - with null safety
             if (envelopes.isNotEmpty()) {
-                val totalBudget = envelopes.sumOf { it.budgetAmountKes }
-                val totalSpent = envelopes.sumOf { it.spentAmountKes }
-                val overallUsage = if (totalBudget > 0) (totalSpent / totalBudget * 100).toInt() else 0
+                val totalBudget = envelopes.sumOf { envelope -> 
+                    envelope.budgetAmountKes.takeIf { !it.isNaN() && it.isFinite() } ?: 0.0 
+                }
+                val totalSpent = envelopes.sumOf { envelope -> 
+                    envelope.spentAmountKes.takeIf { !it.isNaN() && it.isFinite() } ?: 0.0 
+                }
+                val overallUsage = if (totalBudget > 0) {
+                    ((totalSpent / totalBudget) * 100).toInt().coerceIn(0, 999)
+                } else 0
                 
                 Card(
                     colors = CardDefaults.cardColors(
@@ -148,23 +155,32 @@ private fun EnvelopeCard(
     envelope: EnvelopeEntity,
     modifier: Modifier = Modifier
 ) {
-    // Color scheme based on envelope status
+    // Color scheme based on envelope status - with safety
     val envelopeColor = try {
-        Color(android.graphics.Color.parseColor(envelope.color))
+        if (envelope.color.isNotBlank() && envelope.color.startsWith("#")) {
+            Color(android.graphics.Color.parseColor(envelope.color))
+        } else {
+            Color(0xFF607D8B) // Default gray
+        }
     } catch (e: Exception) {
         Color(0xFF607D8B) // Default gray
     }
     
+    // Safe budget usage calculation
+    val safeUsagePercentage = envelope.budgetUsagePercentage.takeIf { 
+        !it.isNaN() && it.isFinite() 
+    } ?: 0.0
+    
     val warningColor = when {
         envelope.isOverBudget -> Color(0xFFFF5722) // Red
         envelope.isApproachingLimit -> Color(0xFFFF9800) // Orange
-        envelope.budgetUsagePercentage > 0.75 -> Color(0xFFFFC107) // Yellow
+        safeUsagePercentage > 0.75 -> Color(0xFFFFC107) // Yellow
         else -> Color(0xFF4CAF50) // Green
     }
     
-    // Animated progress
+    // Animated progress with safety bounds
     val animatedProgress by animateFloatAsState(
-        targetValue = envelope.budgetUsagePercentage.toFloat(),
+        targetValue = safeUsagePercentage.toFloat().coerceIn(0f, 2f), // Allow up to 200% for over-budget
         animationSpec = tween(durationMillis = 1000, easing = EaseOutCubic),
         label = "EnvelopeProgress"
     )
@@ -221,14 +237,17 @@ private fun EnvelopeCard(
             
             // Balance Information
             Column {
-                // Current Balance
+                // Current Balance - with safety
                 Text(
                     text = "Balance",
                     fontSize = 10.sp,
                     color = Color.White.copy(alpha = 0.7f)
                 )
+                val safeBalance = envelope.currentBalanceKes.takeIf { 
+                    !it.isNaN() && it.isFinite() 
+                } ?: 0.0
                 Text(
-                    text = "KSh ${String.format("%.2f", envelope.currentBalanceKes)}",
+                    text = "KSh ${String.format("%.2f", safeBalance)}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -236,8 +255,15 @@ private fun EnvelopeCard(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Budget Progress
-                if (envelope.budgetAmountKes > 0) {
+                // Budget Progress - with safety
+                val safeBudgetAmount = envelope.budgetAmountKes.takeIf { 
+                    !it.isNaN() && it.isFinite() && it > 0 
+                } ?: 0.0
+                val safeSpentAmount = envelope.spentAmountKes.takeIf { 
+                    !it.isNaN() && it.isFinite() 
+                } ?: 0.0
+                
+                if (safeBudgetAmount > 0) {
                     Text(
                         text = "Budget Usage",
                         fontSize = 10.sp,
@@ -259,26 +285,27 @@ private fun EnvelopeCard(
                     
                     Spacer(modifier = Modifier.height(4.dp))
                     
-                    // Budget Text
+                    // Budget Text - with safe values
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "KSh ${String.format("%.0f", envelope.spentAmountKes)}",
+                            text = "KSh ${String.format("%.0f", safeSpentAmount)}",
                             fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                         Text(
-                            text = "KSh ${String.format("%.0f", envelope.budgetAmountKes)}",
+                            text = "KSh ${String.format("%.0f", safeBudgetAmount)}",
                             fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                     }
                     
-                    // Usage percentage
+                    // Usage percentage - with safe calculation
+                    val safeUsagePercent = (safeUsagePercentage * 100).toInt().coerceIn(0, 999)
                     Text(
-                        text = "${(envelope.budgetUsagePercentage * 100).toInt()}% used",
+                        text = "${safeUsagePercent}% used",
                         fontSize = 12.sp,
                         color = warningColor,
                         fontWeight = FontWeight.Medium,

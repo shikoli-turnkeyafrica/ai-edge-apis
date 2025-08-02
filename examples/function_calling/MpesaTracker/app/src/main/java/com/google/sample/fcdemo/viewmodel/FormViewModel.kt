@@ -137,7 +137,7 @@ class FormViewModel : ViewModel() {
                     chatSession = generativeModel.startChat()
                 }
                 val response = chatSession!!.sendMessage(spokenText)
-                Log.d(TAG, "Hammer Response: $response") // Log response
+                Log.d(TAG, "Hammer Response received - candidates: ${response.candidatesCount}") // Safe logging
 
                 response.getCandidates(0).content.partsList?.let {
                     parseResponse(it)

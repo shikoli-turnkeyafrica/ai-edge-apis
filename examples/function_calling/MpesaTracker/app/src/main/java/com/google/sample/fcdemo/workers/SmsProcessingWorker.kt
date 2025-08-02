@@ -84,17 +84,41 @@ class SmsProcessingWorker(
                 Log.d(TAG, "WorkManager: Sending SMS to model: $smsText")
                 agentManager.addChatMessage(AgentType.FINANCE_IQ, "🔍 Sending SMS to AI model for analysis...")
                 
-            val response = withTimeout(120000L) { // 2 minutes timeout
+            // 🔄 RETRY MECHANISM: Try up to 2 times if AI doesn't follow function-call-only requirement
+            var response = withTimeout(120000L) { // 2 minutes timeout
                 chatSession.sendMessage(smsText)
             }
+            
+            // Check if first attempt violated function-call-only requirement
+            var retryAttempted = false
+            if (response.candidatesCount > 0) {
+                val candidate = response.getCandidates(0)
+                val parts = candidate.content.partsList
+                var hasTextOnly = false
                 
-                // 🔍 DETAILED RESPONSE DEBUGGING
+                parts?.forEach { part ->
+                    if (part?.hasText() == true && part.hasFunctionCall() == false) {
+                        hasTextOnly = true
+                    }
+                }
+                
+                if (hasTextOnly && !retryAttempted) {
+                    Log.w(TAG, "🔄 AI returned text instead of function call - retrying once...")
+                    agentManager.addChatMessage(AgentType.FINANCE_IQ, "🔄 Retrying - AI must use function calls only...")
+                    
+                    retryAttempted = true
+                    response = withTimeout(120000L) {
+                        chatSession.sendMessage("FUNCTION CALL REQUIRED: $smsText")
+                    }
+                }
+            }
+                
+                // 🔍 SAFE RESPONSE DEBUGGING (avoid protobuf toString crashes)
                 Log.i(TAG, "=== AI MODEL RESPONSE DEBUG ===")
-                Log.i(TAG, "Raw response object: $response")
                 Log.i(TAG, "Response class: ${response.javaClass.simpleName}")
                 
                 try {
-                    // Log response structure
+                    // Log response structure safely
                     Log.i(TAG, "Response candidates count: ${response.candidatesCount}")
                     
                     for (candidateIndex in 0 until response.candidatesCount) {
@@ -109,7 +133,12 @@ class SmsProcessingWorker(
                             Log.i(TAG, "    - Has function call: ${part.hasFunctionCall()}")
                             
                             if (part.hasText()) {
-                                Log.i(TAG, "    - Text content: '${part.text}'")
+                                // Safely truncate text content to prevent log overflow
+                                val textContent = part.text
+                                val truncatedText = if (textContent.length > 200) {
+                                    textContent.take(200) + "... [truncated]"
+                                } else textContent
+                                Log.i(TAG, "    - Text content: '$truncatedText'")
                             }
                             
                             if (part.hasFunctionCall()) {
@@ -152,16 +181,29 @@ class SmsProcessingWorker(
                     val candidate = response.getCandidates(0)
                     Log.d(TAG, "WorkManager: Candidate content parts: ${candidate.content.partsCount}")
                     
+                    // 🔍 ENHANCED VALIDATION: Check for actual function calls
+                    var hasFunctionCalls = false
+                    var hasTextContent = false
+                    
                     candidate.content.partsList?.forEachIndexed { index, part ->
                         Log.d(TAG, "WorkManager: Part $index:")
                         Log.d(TAG, "  - hasText: ${part?.hasText()}")
                         Log.d(TAG, "  - hasFunctionCall: ${part?.hasFunctionCall()}")
                         
                         if (part?.hasText() == true) {
-                            Log.d(TAG, "  - text: '${part.text}'")
+                            hasTextContent = true
+                            // 🔍 SAFE TEXT LOGGING: Truncate large text to prevent crashes
+                            val textContent = part.text
+                            val truncatedText = if (textContent.length > 100) {
+                                textContent.take(100) + "... [truncated]"
+                            } else textContent
+                            Log.d(TAG, "  - text: '$truncatedText'")
+                            // 🚨 CRITICAL: If AI returns text instead of function call, this is a failure
+                            Log.w(TAG, "  ⚠️ AI returned TEXT instead of FUNCTION CALL - this violates system instructions!")
                         }
                         
                         if (part?.hasFunctionCall() == true) {
+                            hasFunctionCalls = true
                             val funcCall = part.functionCall
                             Log.d(TAG, "  - function name: '${funcCall.name}'")
                             Log.d(TAG, "  - function args count: ${funcCall.args.fieldsCount}")
@@ -174,9 +216,20 @@ class SmsProcessingWorker(
                         }
                     }
                     
+                    // 🔍 ENHANCED DEBUGGING: Log AI behavior analysis
+                    Log.i(TAG, "=== AI BEHAVIOR ANALYSIS ===")
+                    Log.i(TAG, "Has function calls: $hasFunctionCalls")
+                    Log.i(TAG, "Has text content: $hasTextContent")
+                    Log.i(TAG, "Parts count: ${candidate.content.partsCount}")
+                    
+                    if (hasTextContent && !hasFunctionCalls) {
+                        Log.e(TAG, "🚨 CRITICAL: AI returned plain text - system instructions violated!")
+                        agentManager.addChatMessage(AgentType.FINANCE_IQ, "⚠️ AI model violated function-call-only requirement")
+                    }
+                    
                     // Try to parse and save transaction
                     val parts = candidate.content.partsList
-                    if (parts != null && parts.isNotEmpty()) {
+                    if (parts != null && parts.isNotEmpty() && hasFunctionCalls) {
                         // Update FinanceIQ Agent: Data Extracted Successfully
                         agentManager.updateFinanceIQState(
                             status = AgentStatus.COMPLETE,
@@ -217,15 +270,24 @@ class SmsProcessingWorker(
                         Log.i(TAG, "WorkManager: SMS processing completed successfully with AI function calling")
                 Result.success()
                     } else {
-                        Log.e(TAG, "WorkManager: No content parts in model response")
+                        // 🔍 ENHANCED ERROR REPORTING: More specific error messages
+                        val errorReason = when {
+                            parts == null -> "Content parts list is null"
+                            parts.isEmpty() -> "Content parts list is empty"
+                            !hasFunctionCalls && hasTextContent -> "AI returned text instead of function call"
+                            !hasFunctionCalls && !hasTextContent -> "No function calls or content found"
+                            else -> "Unknown parsing error"
+                        }
                         
-                        // Update agents with error
+                        Log.e(TAG, "WorkManager: Failed to extract transaction data - $errorReason")
+                        
+                        // Update agents with detailed error
                         agentManager.updateFinanceIQState(
                             status = AgentStatus.ERROR,
-                            message = "No data found in response",
+                            message = "AI model error: $errorReason",
                             progress = 0f
                         )
-                        agentManager.addChatMessage(AgentType.FINANCE_IQ, "❌ No transaction data found in AI response")
+                        agentManager.addChatMessage(AgentType.FINANCE_IQ, "❌ $errorReason - Check system instructions")
                         agentManager.completeSession(success = false)
                         
                         Result.failure()
@@ -433,7 +495,12 @@ class SmsProcessingWorker(
             Log.e(TAG, "WorkManager: No function calls found in response parts!")
             parts.forEachIndexed { index, part ->
                 if (part?.hasText() == true) {
-                    Log.e(TAG, "WorkManager: Part $index text: '${part.text}'")
+                    // 🔍 SAFE ERROR LOGGING: Truncate large text to prevent crashes
+                    val textContent = part.text
+                    val truncatedText = if (textContent.length > 150) {
+                        textContent.take(150) + "... [truncated]"
+                    } else textContent
+                    Log.e(TAG, "WorkManager: Part $index text: '$truncatedText'")
                 }
             }
         }

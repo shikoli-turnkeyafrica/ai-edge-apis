@@ -14,6 +14,13 @@
 **Who needs this:** Everyone - this is the master timeline and task list  
 **Key info:** Daily tasks, deadlines, team responsibilities, success metrics
 
+### **🚨 CRITICAL: Content Updates Required TODAY**
+**File:** [`dejin-alignment-improvement-plan.md`](./dejin-alignment-improvement-plan.md)  
+**Purpose:** Mandatory Dejin integration text for all 5 posts - MUST be completed before any publishing  
+**Who needs this:** Content team (PRIORITY #1), copywriters, anyone touching post content  
+**Deadline:** End of day Monday, August 4, 2025  
+**⚠️ BLOCKER:** Posts cannot be published without these updates
+
 ### **📱 Daily Operations Guide**
 **File:** [`daily-promotion-checklist.md`](./daily-promotion-checklist.md)  
 **Purpose:** Day-by-day actionable tasks for each week of the campaign  
@@ -79,10 +86,8 @@
 
 ## 🏢 **Corporate Alignment & Business Development**
 
-### **Dejin.io Integration Strategy**
-**File:** [`dejin-alignment-improvement-plan.md`](./dejin-alignment-improvement-plan.md)  
-**Purpose:** Ensure all content connects personal brand to Dejin business objectives  
-**Who needs this:** Content team, copywriters, business development  
+### **Dejin.io Integration Requirements**
+**Reference:** See Essential Files section - [`dejin-alignment-improvement-plan.md`](./dejin-alignment-improvement-plan.md) (PRIORITY #1)
 **Key requirements:**
 - All posts must include "Founder, Dejin.io" in byline
 - Reference "60+ clients across 10 countries" credibility  

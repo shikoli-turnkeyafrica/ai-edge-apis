@@ -21,6 +21,20 @@
 **Deadline:** End of day Monday, August 4, 2025  
 **⚠️ BLOCKER:** Posts cannot be published without these updates
 
+### **🌐 CRITICAL: Website Updates Required TUESDAY**
+**Reference:**
+- [`master-implementation-plan.md`](./master-implementation-plan.md) (Tuesday Aug 5 section)
+- Detailed checklist ➜ [`website-alignment-checklist.md`](./website-alignment-checklist.md)  
+**Purpose:** Dejin.io infrastructure to support LinkedIn campaign and convert traffic to leads  
+**Who needs this:** Website/Digital team, developers, business development  
+**Deadline:** End of day Tuesday, August 5, 2025  
+**Key deliverables:**
+- **WealthWise Case Study Page** ("WealthWise: Pocket-AI Transforms Financial SMS Chaos")
+- **Blog Section Setup** (SMS Revolution Series category + cross-posting)
+- **Finance Industry Showcase** (Add WealthWise to Vertical AI Platforms)
+- **"Pocket-AI Strategy Session" Consultation Landing Page**
+- **Newsletter Integration** (footer copy + automated welcome sequence)
+
 ### **📱 Daily Operations Guide**
 **File:** [`daily-promotion-checklist.md`](./daily-promotion-checklist.md)  
 **Purpose:** Day-by-day actionable tasks for each week of the campaign  
@@ -151,6 +165,11 @@
 - **Responsibilities:** Daily engagement, comment responses, narrative consistency
 - **Success metric:** Response time under 2 hours, Dejin integration compliance
 
+### **Website/Digital Team Lead:**
+- **Primary files:** master-implementation-plan.md (Tuesday Aug 5 section)
+- **Responsibilities:** Dejin.io updates, WealthWise case study, consultation landing page, blog cross-posting
+- **Success metric:** Case study live by Week 3, consultation form submissions tracking
+
 ### **Video Team Lead:**
 - **Primary file:** video-content-guide.md
 - **Responsibilities:** 7 video asset creation, platform optimization
@@ -207,6 +226,7 @@
 
 ### **Campaign Issues:**
 - **Content problems:** Review dejin-alignment-improvement-plan.md
+- **Website/Dejin.io issues:** Reference master-implementation-plan.md Tuesday Aug 5 section
 - **Engagement crisis:** Follow daily-promotion-checklist.md protocols
 - **Video technical issues:** Reference video-content-guide.md specifications
 - **Business inquiry overflow:** Use dejin-alignment-improvement-plan.md lead process

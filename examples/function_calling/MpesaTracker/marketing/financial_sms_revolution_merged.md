@@ -17,7 +17,7 @@ Jon Doe, a Debit of USD 3.18 done at Amazon Digital Service...
 Dear Customer, Txn on Diamond Trust Bank Kenya Prepaid... is Declined...
 ```
 
-Two months ago, while teaching an AI workshop for the **Institute of Internal Auditors**, an attendee asked a deceptively simple question:
+Two months ago, while facilitating an AI workshop fluency course, an attendee asked a deceptively simple question:
 
 > *"Can we organise the mess of SMS alerts we get from banks?"*
 
